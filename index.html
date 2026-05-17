@@ -443,10 +443,34 @@ function fmt(s) {
   return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
 }
 
-function b64e(str) { return btoa(str); }
-function b64d(str) { return atob(str); }
-function encObj(obj) { return b64e(JSON.stringify(obj)); }
-function decObj(str) { try { return JSON.parse(b64d(str.trim())); } catch(e) { return null; } }
+function b64e(str) { return btoa(unescape(encodeURIComponent(str))); }
+function b64d(str) { return decodeURIComponent(escape(atob(str))); }
+
+// Compress SDP to minimal form for QR (SDP is ~2KB raw, too large for QR)
+function compressSDP(desc) {
+  const sdp = desc.sdp;
+  const lines = sdp.split('\r\n').filter(Boolean);
+  // Keep only the lines needed to reconstruct a valid offer/answer
+  const keep = lines.filter(l =>
+    l.startsWith('v=') || l.startsWith('o=') || l.startsWith('s=') ||
+    l.startsWith('t=') || l.startsWith('m=') || l.startsWith('c=') ||
+    l.startsWith('a=ice-ufrag') || l.startsWith('a=ice-pwd') ||
+    l.startsWith('a=fingerprint') || l.startsWith('a=setup') ||
+    l.startsWith('a=mid') || l.startsWith('a=sendrecv') ||
+    l.startsWith('a=sendonly') || l.startsWith('a=recvonly') ||
+    l.startsWith('a=inactive') || l.startsWith('a=sctp') ||
+    l.startsWith('a=max-message') || l.startsWith('a=candidate') ||
+    l.startsWith('a=end-of-candidates') || l.startsWith('a=group') ||
+    l.startsWith('a=msid-semantic') || l.startsWith('a=rtcp-mux') ||
+    l.startsWith('a=ice-options')
+  );
+  return b64e(JSON.stringify({ type: desc.type, sdp: keep.join('\r\n') + '\r\n' }));
+}
+
+function decObj(str) {
+  try { return JSON.parse(b64d(str.trim())); } catch(e) { return null; }
+}
+function encObj(obj) { return compressSDP(obj); }
 
 // ══════════════════════════════════════════════════════
 //  HOST SETUP
@@ -500,14 +524,24 @@ async function createHostPeerSlot() {
 function renderHostQR(encoded) {
   const container = document.getElementById('host-qr-display');
   container.innerHTML = '';
-  new QRCode(container, {
-    text: encoded,
-    width: 168,
-    height: 168,
-    colorDark: '#000',
-    colorLight: '#fff',
-    correctLevel: QRCode.CorrectLevel.M
-  });
+  console.log('[SyncPlay] QR data length:', encoded.length);
+  if (encoded.length > 1500) {
+    container.innerHTML = '<p style="font-size:11px;color:#f76a6a;text-align:center;padding:8px">SDP too large for QR.<br>Use paste method below.</p>';
+    return;
+  }
+  try {
+    new QRCode(container, {
+      text: encoded,
+      width: 168,
+      height: 168,
+      colorDark: '#000',
+      colorLight: '#fff',
+      correctLevel: QRCode.CorrectLevel.L
+    });
+  } catch(e) {
+    container.innerHTML = '<p style="font-size:11px;color:#f76a6a;text-align:center;padding:8px">QR failed. Use paste below.</p>';
+    console.warn('[SyncPlay] QR error:', e);
+  }
 }
 
 function renderHostPeerList() {
@@ -736,7 +770,16 @@ async function processHostOffer(raw) {
   // show answer QR
   const container = document.getElementById('peer-answer-qr');
   container.innerHTML = '';
-  new QRCode(container, { text: encoded, width: 168, height: 168, colorDark: '#000', colorLight: '#fff', correctLevel: QRCode.CorrectLevel.M });
+  console.log('[SyncPlay] Peer answer QR length:', encoded.length);
+  try {
+    if (encoded.length <= 1500) {
+      new QRCode(container, { text: encoded, width: 168, height: 168, colorDark: '#000', colorLight: '#fff', correctLevel: QRCode.CorrectLevel.L });
+    } else {
+      container.innerHTML = '<p style="font-size:11px;color:#f76a6a;text-align:center;padding:8px">SDP too large for QR.<br>Use copy/paste below.</p>';
+    }
+  } catch(e) {
+    container.innerHTML = '<p style="font-size:11px;color:#f76a6a;text-align:center;padding:8px">Use copy/paste below.</p>';
+  }
 
   document.getElementById('peer-answer-out').value = encoded;
   toast('✓ Answer generated — show to host');
