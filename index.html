@@ -214,32 +214,21 @@
     </button>
   </div>
 
-  <!-- Step 2: Share QR -->
+  <!-- Step 2: Room code -->
   <div id="host-step-2" class="step">
     <p class="step-label">Step 2 of 3</p>
-    <h2 class="step-title">Invite peers</h2>
-    <p class="step-sub">Show this QR to each peer device. They'll scan it to connect directly over WiFi.</p>
-    <div class="qr-container" id="host-qr-display"></div>
-    <div class="instruction-box">
-      <p><strong>How it works:</strong> The QR contains a WebRTC offer. After scanning, each peer's device generates an answer — they'll show you a QR to scan back.</p>
+    <h2 class="step-title">Share room code</h2>
+    <p class="step-sub">Tell the other device this 4-digit code. They type it in to join instantly.</p>
+    <div style="background:var(--bg3);border-radius:20px;border:1px solid var(--border2);padding:32px 20px;text-align:center;margin-bottom:20px;">
+      <p style="font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:0.12em;margin-bottom:12px">ROOM CODE</p>
+      <p id="host-room-code" style="font-family:var(--mono);font-size:56px;font-weight:500;letter-spacing:14px;color:var(--accent)">——</p>
+      <p id="host-sig-status" style="font-size:12px;color:var(--muted);margin-top:12px;font-family:var(--mono)">connecting…</p>
     </div>
     <div id="host-peer-list" class="peer-list"></div>
     <div class="spacer"></div>
     <button class="btn primary" id="host-step2-next" onclick="hostGoStep3()" disabled>
-      <span id="host-step2-btn-text">Waiting for peers…</span><span class="btn-icon">→</span>
+      <span id="host-step2-btn-text">Waiting for peer…</span><span class="btn-icon">→</span>
     </button>
-    <div id="host-answer-section" class="mt16">
-      <div class="code-input-wrap">
-        <label>Paste peer answer here (or scan their QR)</label>
-        <textarea id="host-answer-input" placeholder="Paste the base64 answer from peer…"></textarea>
-      </div>
-      <button class="btn secondary" onclick="hostAcceptAnswer()">
-        <span>Accept peer answer</span><span class="btn-icon">✓</span>
-      </button>
-      <button class="btn secondary mt16" id="host-scan-answer-btn" onclick="startScanForHost()">
-        <span>Scan peer's QR instead</span><span class="btn-icon">📷</span>
-      </button>
-    </div>
   </div>
 
   <!-- Step 3: Wait for peers ready -->
@@ -295,41 +284,22 @@
     <span class="screen-title">Join room</span>
   </div>
 
-  <!-- Step 1: Scan host QR -->
+  <!-- Step 1: Enter room code -->
   <div id="peer-step-1" class="step active">
-    <p class="step-label">Step 1 of 3</p>
-    <h2 class="step-title">Scan host QR</h2>
-    <p class="step-sub">Point your camera at the host's QR code to connect.</p>
-    <div id="qr-reader-container">
-      <video id="qr-video" autoplay muted playsinline></video>
-      <div class="scan-overlay"><div class="scan-frame"></div></div>
+    <p class="step-label">Step 1 of 2</p>
+    <h2 class="step-title">Enter room code</h2>
+    <p class="step-sub">Type the 4-digit code shown on the host device.</p>
+    <div style="margin:8px 0 24px;">
+      <input id="peer-code-input" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4"
+        placeholder="1234"
+        style="width:100%;text-align:center;font-family:var(--mono);font-size:48px;font-weight:500;
+               letter-spacing:12px;padding:24px 12px;background:var(--bg3);border:1px solid var(--border2);
+               border-radius:16px;color:var(--accent);outline:none;"
+        oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,4)">
+      <p id="peer-sig-status" style="font-family:var(--mono);font-size:12px;color:var(--muted);text-align:center;margin-top:12px;">connecting to relay…</p>
     </div>
-    <div class="instruction-box">
-      <p><strong>No camera?</strong> Paste the connection code below instead.</p>
-    </div>
-    <div class="code-input-wrap">
-      <label>Or paste host offer code</label>
-      <textarea id="peer-offer-input" placeholder="Paste base64 offer from host…"></textarea>
-    </div>
-    <button class="btn primary" onclick="peerAcceptOffer()">
-      <span>Connect to host</span><span class="btn-icon">→</span>
-    </button>
-  </div>
-
-  <!-- Step 2: Show answer QR -->
-  <div id="peer-step-2" class="step">
-    <p class="step-label">Step 2 of 3</p>
-    <h2 class="step-title">Show this to host</h2>
-    <p class="step-sub">The host scans your QR (or paste the code) to complete the handshake.</p>
-    <div class="qr-container" id="peer-answer-qr"></div>
-    <div class="code-input-wrap mt16">
-      <label>Or copy this answer code</label>
-      <textarea id="peer-answer-out" readonly style="height:60px;cursor:pointer" onclick="copyAnswerCode()"></textarea>
-    </div>
-    <p class="text-muted" style="text-align:center;margin:8px 0">Waiting for host to accept…</p>
-    <div id="peer-connected-indicator" class="hidden text-success" style="text-align:center;font-weight:600;margin:12px 0">✓ Connected to host!</div>
-    <button class="btn primary mt24 hidden" id="peer-step2-next" onclick="peerGoStep3()">
-      <span>Select my file</span><span class="btn-icon">→</span>
+    <button class="btn primary" onclick="peerJoinRoom()">
+      <span>Join room</span><span class="btn-icon">→</span>
     </button>
   </div>
 
@@ -382,20 +352,7 @@
   <video id="peer-video" style="display:none" playsinline></video>
 </div>
 
-<!-- ══════════════════════════════════
-     SCAN (host scanning peer answer)
-══════════════════════════════════ -->
-<div id="screen-host-scan" class="screen">
-  <div class="screen-header">
-    <div class="back-btn" onclick="stopHostScan()">←</div>
-    <span class="screen-title">Scan peer QR</span>
-  </div>
-  <div id="host-qr-reader-container" style="width:100%;aspect-ratio:1;border-radius:16px;overflow:hidden;background:#000;position:relative">
-    <video id="host-scan-video" autoplay muted playsinline style="width:100%;height:100%;object-fit:cover"></video>
-    <div class="scan-overlay"><div class="scan-frame"></div></div>
-  </div>
-  <p class="step-sub mt24">Point camera at the peer's answer QR code</p>
-</div>
+
 
 </div><!-- /app -->
 <div id="toast">✓ Done</div>
@@ -404,23 +361,31 @@
 // ══════════════════════════════════════════════════════
 //  GLOBALS
 // ══════════════════════════════════════════════════════
-const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
-let hostPeerConnections = [];   // array of {pc, dc, id, name, ready}
-let peerPC = null;              // peer's single RTCPeerConnection
-let peerDC = null;              // peer's DataChannel
+const ICE_SERVERS = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' }
+];
+
+// Signaling: use a free public WebSocket relay (PieSocket public channel)
+// Each room gets a unique channel derived from the 4-digit code
+const WS_BASE = 'wss://free.blr2.piesocket.com/v3/';
+const WS_KEY  = 'oCdCMcMPQpKf7JNTTsDmYVMaB1hrQtrBmWG11MRonI8Fn9RFr87jKc8sYAm';
+
+let sigWS = null;
+let roomCode = null;
+let isHost = false;
+
+let hostPeerConnections = [];
+let peerPC = null;
+let peerDC = null;
 let hostFile = null;
 let peerFile = null;
-let hostVideo = null;
+let hostVideoEl = null;
 let peerVideoEl = null;
 let isHostPlaying = false;
-let clockOffset = 0;            // ms diff between local and host clock
 let driftTimer = null;
-let peerScanStream = null;
-let hostScanStream = null;
-let peerQRInterval = null;
-let hostQRInterval = null;
-let peerCount = 0;
 
+// ── Utilities ──────────────────────────────────────────
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
@@ -431,7 +396,7 @@ function showStep(prefix, n) {
   document.getElementById(`${prefix}-step-${n}`).classList.add('active');
 }
 
-function toast(msg, dur=2200) {
+function toast(msg, dur=2500) {
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.classList.add('show');
@@ -443,34 +408,38 @@ function fmt(s) {
   return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
 }
 
-function b64e(str) { return btoa(unescape(encodeURIComponent(str))); }
-function b64d(str) { return decodeURIComponent(escape(atob(str))); }
-
-// Compress SDP to minimal form for QR (SDP is ~2KB raw, too large for QR)
-function compressSDP(desc) {
-  const sdp = desc.sdp;
-  const lines = sdp.split('\r\n').filter(Boolean);
-  // Keep only the lines needed to reconstruct a valid offer/answer
-  const keep = lines.filter(l =>
-    l.startsWith('v=') || l.startsWith('o=') || l.startsWith('s=') ||
-    l.startsWith('t=') || l.startsWith('m=') || l.startsWith('c=') ||
-    l.startsWith('a=ice-ufrag') || l.startsWith('a=ice-pwd') ||
-    l.startsWith('a=fingerprint') || l.startsWith('a=setup') ||
-    l.startsWith('a=mid') || l.startsWith('a=sendrecv') ||
-    l.startsWith('a=sendonly') || l.startsWith('a=recvonly') ||
-    l.startsWith('a=inactive') || l.startsWith('a=sctp') ||
-    l.startsWith('a=max-message') || l.startsWith('a=candidate') ||
-    l.startsWith('a=end-of-candidates') || l.startsWith('a=group') ||
-    l.startsWith('a=msid-semantic') || l.startsWith('a=rtcp-mux') ||
-    l.startsWith('a=ice-options')
-  );
-  return b64e(JSON.stringify({ type: desc.type, sdp: keep.join('\r\n') + '\r\n' }));
+function genCode() {
+  return String(Math.floor(1000 + Math.random() * 9000));
 }
 
-function decObj(str) {
-  try { return JSON.parse(b64d(str.trim())); } catch(e) { return null; }
+// ── Signaling via WebSocket relay ──────────────────────
+function sigConnect(code, role, onMsg) {
+  const channel = code + (role === 'host' ? '_h' : '_p');
+  const url = `${WS_BASE}${channel}?api_key=${WS_KEY}&notify_self=0`;
+  const ws = new WebSocket(url);
+  ws.onopen = () => {
+    console.log('[SyncPlay] Signaling connected', channel);
+    if (role === 'host') {
+      document.getElementById('host-sig-status').textContent = '✓ ready — share the code above';
+      document.getElementById('host-sig-status').style.color = 'var(--accent2)';
+    } else {
+      document.getElementById('peer-sig-status').textContent = '✓ relay connected';
+      document.getElementById('peer-sig-status').style.color = 'var(--accent2)';
+    }
+  };
+  ws.onmessage = e => {
+    try { onMsg(JSON.parse(e.data)); } catch(err) { console.warn('sig msg parse err', err); }
+  };
+  ws.onerror = err => console.warn('[SyncPlay] WS error', err);
+  ws.onclose = () => console.log('[SyncPlay] WS closed');
+  return ws;
 }
-function encObj(obj) { return compressSDP(obj); }
+
+function sigSend(ws, msg) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(msg));
+  }
+}
 
 // ══════════════════════════════════════════════════════
 //  HOST SETUP
@@ -481,107 +450,79 @@ document.getElementById('host-file-input').addEventListener('change', function(e
   hostFile = f;
   document.getElementById('host-file-icon').textContent = '🎬';
   document.getElementById('host-file-label').textContent = f.name;
-  document.getElementById('host-file-sub').textContent = (f.size/(1024*1024)).toFixed(1) + ' MB · ' + f.type.split('/')[1];
+  document.getElementById('host-file-sub').textContent = (f.size/(1024*1024)).toFixed(1) + ' MB';
   document.getElementById('host-file-zone').classList.add('has-file');
   document.getElementById('host-step1-next').style.display = 'flex';
 });
 
 async function hostGoStep2() {
+  isHost = true;
+  roomCode = genCode();
+  document.getElementById('host-room-code').textContent = roomCode;
   showStep('host', 2);
-  await createHostPeerSlot();
+
+  // Connect signaling on host channel
+  sigWS = sigConnect(roomCode, 'host', handleHostSigMsg);
 }
 
-async function createHostPeerSlot() {
-  peerCount++;
-  const peerId = 'peer-' + peerCount;
-  const peerName = 'Device ' + peerCount;
+async function handleHostSigMsg(msg) {
+  console.log('[Host] sig msg:', msg.type);
+  if (msg.type === 'join') {
+    // Peer wants to join — create a peer slot and send offer
+    await createHostPeerSlot(msg.peerId);
+  }
+  if (msg.type === 'answer') {
+    // Peer sent back an answer
+    const slot = hostPeerConnections.find(p => p.id === msg.peerId);
+    if (!slot) return;
+    try {
+      await slot.pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+      console.log('[Host] remote desc set for', msg.peerId);
+    } catch(e) {
+      console.warn('[Host] setRemoteDescription failed', e);
+    }
+  }
+  if (msg.type === 'ice') {
+    const slot = hostPeerConnections.find(p => p.id === msg.peerId);
+    if (slot) {
+      try { await slot.pc.addIceCandidate(new RTCIceCandidate(msg.candidate)); } catch(e) {}
+    }
+  }
+}
 
+async function createHostPeerSlot(peerId) {
+  const peerName = 'Device ' + (hostPeerConnections.length + 1);
   const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
   const dc = pc.createDataChannel('sync', { ordered: true });
-
   const slot = { pc, dc, id: peerId, name: peerName, ready: false };
   hostPeerConnections.push(slot);
 
   setupHostDataChannel(slot);
 
+  pc.onicecandidate = e => {
+    if (e.candidate) {
+      sigSend(sigWS, { type: 'ice_h', peerId, candidate: e.candidate });
+    }
+  };
+
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
+  sigSend(sigWS, { type: 'offer', peerId, sdp: pc.localDescription });
 
-  await new Promise(resolve => {
-    if (pc.iceGatheringState === 'complete') { resolve(); return; }
-    pc.addEventListener('icegatheringstatechange', () => {
-      if (pc.iceGatheringState === 'complete') resolve();
-    });
-    setTimeout(resolve, 3000);
-  });
-
-  const encoded = encObj(pc.localDescription);
-  renderHostQR(encoded);
   renderHostPeerList();
-  return { pc, dc, slot, encoded };
-}
-
-function renderHostQR(encoded) {
-  const container = document.getElementById('host-qr-display');
-  container.innerHTML = '';
-  console.log('[SyncPlay] QR data length:', encoded.length);
-  if (encoded.length > 1500) {
-    container.innerHTML = '<p style="font-size:11px;color:#f76a6a;text-align:center;padding:8px">SDP too large for QR.<br>Use paste method below.</p>';
-    return;
-  }
-  try {
-    new QRCode(container, {
-      text: encoded,
-      width: 168,
-      height: 168,
-      colorDark: '#000',
-      colorLight: '#fff',
-      correctLevel: QRCode.CorrectLevel.L
-    });
-  } catch(e) {
-    container.innerHTML = '<p style="font-size:11px;color:#f76a6a;text-align:center;padding:8px">QR failed. Use paste below.</p>';
-    console.warn('[SyncPlay] QR error:', e);
-  }
-}
-
-function renderHostPeerList() {
-  const list = document.getElementById('host-peer-list');
-  list.innerHTML = hostPeerConnections.map(p => `
-    <div class="peer-item">
-      <span class="peer-name">${p.name}</span>
-      <span class="peer-status ${p.pc.connectionState === 'connected' ? 'ready' : 'waiting'}">
-        ${p.pc.connectionState === 'connected' ? 'connected' : 'awaiting…'}
-      </span>
-    </div>
-  `).join('');
-}
-
-async function hostAcceptAnswer() {
-  const raw = document.getElementById('host-answer-input').value.trim();
-  if (!raw) { toast('⚠ Paste an answer code first'); return; }
-  const desc = decObj(raw);
-  if (!desc) { toast('⚠ Invalid code'); return; }
-  const slot = hostPeerConnections[hostPeerConnections.length - 1];
-  try {
-    await slot.pc.setRemoteDescription(new RTCSessionDescription(desc));
-    toast('✓ Handshake complete');
-    document.getElementById('host-answer-input').value = '';
-    renderHostPeerList();
-    const btn = document.getElementById('host-step2-next');
-    btn.disabled = false;
-    document.getElementById('host-step2-btn-text').textContent = 'Continue to room →';
-  } catch(e) {
-    toast('⚠ Failed: ' + e.message);
-  }
 }
 
 function setupHostDataChannel(slot) {
   slot.dc.onopen = () => {
+    console.log('[Host] DC open with', slot.name);
     renderHostPeerList();
     renderHostPeersStrip();
-    startClockSync(slot);
+    // Enable continue button once at least one peer connected
+    document.getElementById('host-step2-next').disabled = false;
+    document.getElementById('host-step2-btn-text').textContent = 'Continue →';
+    pingPeer(slot);
   };
-  slot.dc.onmessage = (e) => {
+  slot.dc.onmessage = e => {
     const msg = JSON.parse(e.data);
     if (msg.type === 'ready') {
       slot.ready = true;
@@ -590,22 +531,30 @@ function setupHostDataChannel(slot) {
       checkAllReady();
     }
     if (msg.type === 'pong') {
-      const rtt = Date.now() - msg.t;
-      slot.clockOffset = rtt / 2;
+      slot.rtt = Date.now() - msg.t;
     }
   };
-  slot.dc.onerror = (e) => console.warn('DC error', e);
 }
 
-function startClockSync(slot) {
-  function ping() {
-    if (slot.dc.readyState === 'open') {
-      slot.dc.send(JSON.stringify({ type: 'ping', t: Date.now() }));
-    }
-  }
-  ping();
-  setTimeout(ping, 500);
-  setTimeout(ping, 1200);
+function pingPeer(slot) {
+  [0, 400, 1000].forEach(delay => {
+    setTimeout(() => {
+      if (slot.dc.readyState === 'open')
+        slot.dc.send(JSON.stringify({ type: 'ping', t: Date.now() }));
+    }, delay);
+  });
+}
+
+function renderHostPeerList() {
+  const list = document.getElementById('host-peer-list');
+  list.innerHTML = hostPeerConnections.map(p => `
+    <div class="peer-item">
+      <span class="peer-name">${p.name}</span>
+      <span class="peer-status ${p.dc && p.dc.readyState === 'open' ? 'ready' : 'syncing'}">
+        ${p.dc && p.dc.readyState === 'open' ? '✓ connected' : 'connecting…'}
+      </span>
+    </div>
+  `).join('') || '<p class="text-muted" style="text-align:center;padding:16px">No peers yet…</p>';
 }
 
 function renderReadyList() {
@@ -623,8 +572,7 @@ function renderReadyList() {
 
 function checkAllReady() {
   const allReady = hostPeerConnections.length > 0 && hostPeerConnections.every(p => p.ready);
-  const btn = document.getElementById('host-launch-btn');
-  btn.disabled = !allReady;
+  document.getElementById('host-launch-btn').disabled = !allReady;
   document.getElementById('host-launch-text').textContent = allReady ? 'Launch playback' : 'Waiting for peers…';
 }
 
@@ -634,32 +582,6 @@ function hostGoStep3() {
   checkAllReady();
 }
 
-function launchHostPlayer() {
-  if (!hostFile) return;
-  showScreen('screen-host-play');
-  hostVideo = document.getElementById('host-video');
-  hostVideo.src = URL.createObjectURL(hostFile);
-  document.getElementById('host-track-name').textContent = hostFile.name;
-  hostVideo.addEventListener('timeupdate', updateHostProgress);
-  hostVideo.addEventListener('loadedmetadata', () => {
-    document.getElementById('host-time-dur').textContent = fmt(hostVideo.duration);
-    document.getElementById('host-track-meta').textContent = fmt(hostVideo.duration) + ' · ' + (hostFile.size/(1024*1024)).toFixed(1) + ' MB';
-  });
-  broadcastToAll({ type: 'file_info', name: hostFile.name, size: hostFile.size });
-  renderHostPeersStrip();
-  startDriftCorrection();
-}
-
-function renderHostPeersStrip() {
-  const strip = document.getElementById('host-peers-strip');
-  strip.innerHTML = hostPeerConnections.map(p => `
-    <div class="peer-dot">
-      <div class="peer-dot-circle ${p.dc && p.dc.readyState==='open' ? 'live' : ''}">${p.name.slice(-1)}</div>
-      <span class="peer-dot-label">${p.name.split(' ')[1] || p.name}</span>
-    </div>
-  `).join('');
-}
-
 function broadcastToAll(msg) {
   const data = JSON.stringify(msg);
   hostPeerConnections.forEach(p => {
@@ -667,132 +589,69 @@ function broadcastToAll(msg) {
   });
 }
 
-function updateHostProgress() {
-  const v = hostVideo;
-  if (!v.duration) return;
-  const pct = (v.currentTime / v.duration) * 100;
-  document.getElementById('host-progress-fill').style.width = pct + '%';
-  document.getElementById('host-progress-thumb').style.left = pct + '%';
-  document.getElementById('host-time-cur').textContent = fmt(v.currentTime);
-  document.getElementById('host-time-dur').textContent = fmt(v.duration);
-}
-
-function hostTogglePlay() {
-  if (!hostVideo) return;
-  if (isHostPlaying) {
-    hostVideo.pause();
-    isHostPlaying = false;
-    document.getElementById('host-play-btn').textContent = '▶';
-    broadcastToAll({ type: 'pause', position: hostVideo.currentTime, t: Date.now() });
-  } else {
-    const playAt = Date.now() + 300;
-    hostVideo.play();
-    isHostPlaying = true;
-    document.getElementById('host-play-btn').textContent = '⏸';
-    broadcastToAll({ type: 'play', position: hostVideo.currentTime, playAt });
-  }
-}
-
-function hostSkip(secs) {
-  if (!hostVideo) return;
-  hostVideo.currentTime = Math.max(0, hostVideo.currentTime + secs);
-  broadcastToAll({ type: 'seek', position: hostVideo.currentTime, t: Date.now() });
-}
-
-function hostSeek(e) {
-  if (!hostVideo || !hostVideo.duration) return;
-  const rect = e.currentTarget.getBoundingClientRect();
-  const pct = (e.clientX - rect.left) / rect.width;
-  const pos = pct * hostVideo.duration;
-  hostVideo.currentTime = pos;
-  broadcastToAll({ type: 'seek', position: pos, t: Date.now() });
-}
-
-function startDriftCorrection() {
-  driftTimer = setInterval(() => {
-    if (!hostVideo || !isHostPlaying) return;
-    broadcastToAll({ type: 'drift_check', position: hostVideo.currentTime, t: Date.now() });
-  }, 8000);
-}
-
 // ══════════════════════════════════════════════════════
 //  PEER JOIN
 // ══════════════════════════════════════════════════════
-async function startPeerQRScan() {
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-    peerScanStream = stream;
-    document.getElementById('qr-video').srcObject = stream;
-    peerQRInterval = setInterval(() => scanFrameForQR('qr-video', handleHostQR), 500);
-  } catch(e) {
-    toast('Camera unavailable, use paste instead');
+let peerSigWS = null;
+let myPeerId = null;
+
+async function peerJoinRoom() {
+  const code = document.getElementById('peer-code-input').value.trim();
+  if (code.length !== 4) { toast('⚠ Enter a 4-digit code'); return; }
+  roomCode = code;
+  myPeerId = 'p' + Date.now().toString(36);
+
+  // Connect on peer channel
+  peerSigWS = sigConnect(code, 'peer', handlePeerSigMsg);
+  peerSigWS.onopen = () => {
+    document.getElementById('peer-sig-status').textContent = '✓ connected — announcing to host…';
+    document.getElementById('peer-sig-status').style.color = 'var(--accent2)';
+    // Announce presence to host
+    setTimeout(() => sigSend(peerSigWS, { type: 'join', peerId: myPeerId }), 300);
+  };
+}
+
+async function handlePeerSigMsg(msg) {
+  console.log('[Peer] sig msg:', msg.type);
+  if (msg.type === 'offer') {
+    if (msg.peerId !== myPeerId) return;
+    await processPeerOffer(msg.sdp);
+  }
+  if (msg.type === 'ice_h') {
+    if (peerPC) {
+      try { await peerPC.addIceCandidate(new RTCIceCandidate(msg.candidate)); } catch(e) {}
+    }
   }
 }
 
-function stopPeerScan() {
-  if (peerScanStream) { peerScanStream.getTracks().forEach(t => t.stop()); peerScanStream = null; }
-  if (peerQRInterval) { clearInterval(peerQRInterval); peerQRInterval = null; }
-}
-
-async function peerAcceptOffer() {
-  let raw = document.getElementById('peer-offer-input').value.trim();
-  if (!raw) { toast('⚠ Paste offer code or scan QR'); return; }
-  await processHostOffer(raw);
-}
-
-async function processHostOffer(raw) {
-  const desc = decObj(raw);
-  if (!desc) { toast('⚠ Invalid offer code'); return; }
-  stopPeerScan();
-
+async function processPeerOffer(sdp) {
   peerPC = new RTCPeerConnection({ iceServers: ICE_SERVERS });
 
-  peerPC.ondatachannel = (e) => {
+  peerPC.ondatachannel = e => {
     peerDC = e.channel;
     setupPeerDataChannel();
   };
 
-  await peerPC.setRemoteDescription(new RTCSessionDescription(desc));
+  peerPC.onicecandidate = e => {
+    if (e.candidate) {
+      sigSend(peerSigWS, { type: 'ice', peerId: myPeerId, candidate: e.candidate });
+    }
+  };
+
+  await peerPC.setRemoteDescription(new RTCSessionDescription(sdp));
   const answer = await peerPC.createAnswer();
   await peerPC.setLocalDescription(answer);
-
-  await new Promise(resolve => {
-    if (peerPC.iceGatheringState === 'complete') { resolve(); return; }
-    peerPC.addEventListener('icegatheringstatechange', () => {
-      if (peerPC.iceGatheringState === 'complete') resolve();
-    });
-    setTimeout(resolve, 3000);
-  });
-
-  const encoded = encObj(peerPC.localDescription);
-  showStep('peer', 2);
-
-  // show answer QR
-  const container = document.getElementById('peer-answer-qr');
-  container.innerHTML = '';
-  console.log('[SyncPlay] Peer answer QR length:', encoded.length);
-  try {
-    if (encoded.length <= 1500) {
-      new QRCode(container, { text: encoded, width: 168, height: 168, colorDark: '#000', colorLight: '#fff', correctLevel: QRCode.CorrectLevel.L });
-    } else {
-      container.innerHTML = '<p style="font-size:11px;color:#f76a6a;text-align:center;padding:8px">SDP too large for QR.<br>Use copy/paste below.</p>';
-    }
-  } catch(e) {
-    container.innerHTML = '<p style="font-size:11px;color:#f76a6a;text-align:center;padding:8px">Use copy/paste below.</p>';
-  }
-
-  document.getElementById('peer-answer-out').value = encoded;
-  toast('✓ Answer generated — show to host');
+  sigSend(peerSigWS, { type: 'answer', peerId: myPeerId, sdp: peerPC.localDescription });
 }
 
 function setupPeerDataChannel() {
   peerDC.onopen = () => {
-    document.getElementById('peer-connected-indicator').classList.remove('hidden');
-    document.getElementById('peer-step2-next').classList.remove('hidden');
+    console.log('[Peer] DC open!');
     toast('✓ Connected to host!');
+    // Move straight to file selection
+    showStep('peer', 3);
   };
-
-  peerDC.onmessage = (e) => {
+  peerDC.onmessage = e => {
     const msg = JSON.parse(e.data);
     if (msg.type === 'ping') {
       peerDC.send(JSON.stringify({ type: 'pong', t: msg.t }));
@@ -800,28 +659,11 @@ function setupPeerDataChannel() {
     if (msg.type === 'file_info') {
       document.getElementById('peer-track-name').textContent = msg.name;
     }
-    if (msg.type === 'play') {
-      handleSyncPlay(msg);
-    }
-    if (msg.type === 'pause') {
-      handleSyncPause(msg);
-    }
-    if (msg.type === 'seek') {
-      handleSyncSeek(msg);
-    }
-    if (msg.type === 'drift_check') {
-      handleDriftCheck(msg);
-    }
+    if (msg.type === 'play') handleSyncPlay(msg);
+    if (msg.type === 'pause') handleSyncPause(msg);
+    if (msg.type === 'seek') handleSyncSeek(msg);
+    if (msg.type === 'drift_check') handleDriftCheck(msg);
   };
-}
-
-function copyAnswerCode() {
-  const val = document.getElementById('peer-answer-out').value;
-  navigator.clipboard.writeText(val).then(() => toast('✓ Copied!'));
-}
-
-function peerGoStep3() {
-  showStep('peer', 3);
 }
 
 document.getElementById('peer-file-input').addEventListener('change', function(e) {
@@ -850,7 +692,87 @@ function peerSendReady() {
     document.getElementById('peer-time-dur').textContent = fmt(peerVideoEl.duration);
   });
   showScreen('screen-peer-play');
-  toast('✓ Ready! Waiting for host to play…');
+  toast('✓ Ready! Waiting for host…');
+}
+
+// ══════════════════════════════════════════════════════
+//  HOST PLAYER
+// ══════════════════════════════════════════════════════
+function launchHostPlayer() {
+  if (!hostFile) return;
+  showScreen('screen-host-play');
+  hostVideoEl = document.getElementById('host-video');
+  hostVideoEl.src = URL.createObjectURL(hostFile);
+  document.getElementById('host-track-name').textContent = hostFile.name;
+  hostVideoEl.addEventListener('timeupdate', updateHostProgress);
+  hostVideoEl.addEventListener('loadedmetadata', () => {
+    document.getElementById('host-time-dur').textContent = fmt(hostVideoEl.duration);
+    document.getElementById('host-track-meta').textContent =
+      fmt(hostVideoEl.duration) + ' · ' + (hostFile.size/(1024*1024)).toFixed(1) + ' MB';
+  });
+  broadcastToAll({ type: 'file_info', name: hostFile.name });
+  renderHostPeersStrip();
+  startDriftBroadcast();
+}
+
+function renderHostPeersStrip() {
+  const strip = document.getElementById('host-peers-strip');
+  strip.innerHTML = hostPeerConnections.map(p => `
+    <div class="peer-dot">
+      <div class="peer-dot-circle ${p.dc && p.dc.readyState==='open' ? 'live' : ''}">
+        ${p.name.slice(-1)}
+      </div>
+      <span class="peer-dot-label">${p.name.split(' ')[1] || p.name}</span>
+    </div>
+  `).join('');
+}
+
+function updateHostProgress() {
+  const v = hostVideoEl;
+  if (!v || !v.duration) return;
+  const pct = (v.currentTime / v.duration) * 100;
+  document.getElementById('host-progress-fill').style.width = pct + '%';
+  document.getElementById('host-progress-thumb').style.left = pct + '%';
+  document.getElementById('host-time-cur').textContent = fmt(v.currentTime);
+}
+
+function hostTogglePlay() {
+  if (!hostVideoEl) return;
+  if (isHostPlaying) {
+    hostVideoEl.pause();
+    isHostPlaying = false;
+    document.getElementById('host-play-btn').textContent = '▶';
+    broadcastToAll({ type: 'pause', position: hostVideoEl.currentTime, t: Date.now() });
+  } else {
+    const playAt = Date.now() + 400;
+    broadcastToAll({ type: 'play', position: hostVideoEl.currentTime, playAt });
+    setTimeout(() => {
+      hostVideoEl.play();
+      isHostPlaying = true;
+      document.getElementById('host-play-btn').textContent = '⏸';
+    }, 400);
+  }
+}
+
+function hostSkip(secs) {
+  if (!hostVideoEl) return;
+  hostVideoEl.currentTime = Math.max(0, hostVideoEl.currentTime + secs);
+  broadcastToAll({ type: 'seek', position: hostVideoEl.currentTime, t: Date.now() });
+}
+
+function hostSeek(e) {
+  if (!hostVideoEl || !hostVideoEl.duration) return;
+  const rect = e.currentTarget.getBoundingClientRect();
+  const pct = (e.clientX - rect.left) / rect.width;
+  hostVideoEl.currentTime = pct * hostVideoEl.duration;
+  broadcastToAll({ type: 'seek', position: hostVideoEl.currentTime, t: Date.now() });
+}
+
+function startDriftBroadcast() {
+  driftTimer = setInterval(() => {
+    if (!hostVideoEl || !isHostPlaying) return;
+    broadcastToAll({ type: 'drift_check', position: hostVideoEl.currentTime, t: Date.now() });
+  }, 8000);
 }
 
 // ══════════════════════════════════════════════════════
@@ -859,7 +781,7 @@ function peerSendReady() {
 function handleSyncPlay(msg) {
   if (!peerVideoEl) return;
   peerVideoEl.currentTime = msg.position;
-  const delay = Math.max(0, msg.playAt - Date.now() - clockOffset);
+  const delay = Math.max(0, msg.playAt - Date.now());
   setTimeout(() => {
     peerVideoEl.play().catch(() => {});
     document.getElementById('peer-vinyl').classList.add('spinning');
@@ -889,7 +811,7 @@ function handleDriftCheck(msg) {
   const drift = Math.abs(peerVideoEl.currentTime - expectedPos);
   if (drift > 0.3) {
     peerVideoEl.currentTime = expectedPos;
-    toast(`⚡ Resync (${drift.toFixed(2)}s drift)`);
+    toast(`⚡ Resynced (${drift.toFixed(2)}s drift)`);
   }
 }
 
@@ -901,77 +823,8 @@ function startPeerProgressUpdate() {
     const pct = (peerVideoEl.currentTime / peerVideoEl.duration) * 100;
     document.getElementById('peer-progress-fill').style.width = pct + '%';
     document.getElementById('peer-time-cur').textContent = fmt(peerVideoEl.currentTime);
-    document.getElementById('peer-time-dur').textContent = fmt(peerVideoEl.duration);
   }, 500);
 }
-
-// ══════════════════════════════════════════════════════
-//  QR SCANNING (jsQR)
-// ══════════════════════════════════════════════════════
-function scanFrameForQR(videoId, callback) {
-  const video = document.getElementById(videoId);
-  if (!video || video.readyState < 2) return;
-  const canvas = document.createElement('canvas');
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(video, 0, 0);
-  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  if (window.jsQR) {
-    const code = jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: 'dontInvert' });
-    if (code && code.data) callback(code.data);
-  }
-}
-
-function handleHostQR(data) {
-  clearInterval(peerQRInterval);
-  stopPeerScan();
-  document.getElementById('peer-offer-input').value = data;
-  processHostOffer(data);
-}
-
-async function startScanForHost() {
-  showScreen('screen-host-scan');
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-    hostScanStream = stream;
-    document.getElementById('host-scan-video').srcObject = stream;
-    hostQRInterval = setInterval(() => scanFrameForQR('host-scan-video', handlePeerAnswerQR), 500);
-  } catch(e) {
-    toast('Camera unavailable'); stopHostScan();
-  }
-}
-
-function stopHostScan() {
-  if (hostScanStream) { hostScanStream.getTracks().forEach(t => t.stop()); hostScanStream = null; }
-  if (hostQRInterval) { clearInterval(hostQRInterval); hostQRInterval = null; }
-  showScreen('screen-host-setup');
-  showStep('host', 2);
-}
-
-async function handlePeerAnswerQR(data) {
-  clearInterval(hostQRInterval);
-  stopHostScan();
-  const desc = decObj(data);
-  if (!desc) { toast('⚠ Invalid QR'); return; }
-  const slot = hostPeerConnections[hostPeerConnections.length - 1];
-  try {
-    await slot.pc.setRemoteDescription(new RTCSessionDescription(desc));
-    toast('✓ Peer connected via QR!');
-    renderHostPeerList();
-    showScreen('screen-host-setup');
-    showStep('host', 2);
-    document.getElementById('host-step2-next').disabled = false;
-    document.getElementById('host-step2-btn-text').textContent = 'Continue to room →';
-  } catch(e) {
-    toast('⚠ ' + e.message);
-  }
-}
-
-// load jsQR from CDN
-const jsQRScript = document.createElement('script');
-jsQRScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.min.js';
-document.head.appendChild(jsQRScript);
 
 // ══════════════════════════════════════════════════════
 //  PWA — MANIFEST + SERVICE WORKER (inlined as blobs)
@@ -1015,8 +868,7 @@ self.addEventListener('fetch',e=>{
 const swBlob = new Blob([swCode], { type: 'application/javascript' });
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register(URL.createObjectURL(swBlob))
-    .then(r => console.log('[SyncPlay] SW registered'))
-    .catch(e => console.warn('[SyncPlay] SW needs HTTPS or localhost:', e.message));
+    .catch(e => console.warn('[SyncPlay] SW needs HTTPS:', e.message));
 }
 
 let deferredInstallPrompt = null;
@@ -1031,7 +883,7 @@ function showInstallBanner() {
   const b = document.createElement('div');
   b.id = 'install-banner';
   b.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1a26;border:1px solid rgba(124,106,247,0.4);border-radius:14px;padding:14px 20px;display:flex;align-items:center;gap:14px;font-family:Syne,sans-serif;font-size:14px;color:#f0eeff;z-index:9999;box-shadow:0 8px 32px rgba(0,0,0,0.6);max-width:calc(100vw - 40px);';
-  b.innerHTML = '<span style="font-size:22px">📲</span><div><p style="font-weight:600;margin:0">Install SyncPlay</p><p style="font-size:12px;color:rgba(240,238,255,0.5);margin:2px 0 0">Add to home screen for best experience</p></div><button onclick="installPWA()" style="background:#7c6af7;border:none;border-radius:8px;color:#fff;font-family:Syne,sans-serif;font-weight:600;font-size:13px;padding:8px 14px;cursor:pointer;white-space:nowrap;flex-shrink:0">Install</button><button onclick="this.parentElement.remove()" style="background:transparent;border:none;color:rgba(240,238,255,0.4);font-size:20px;cursor:pointer;padding:0 4px;flex-shrink:0">×</button>';
+  b.innerHTML = '<span style="font-size:22px">📲</span><div><p style="font-weight:600;margin:0">Install SyncPlay</p><p style="font-size:12px;color:rgba(240,238,255,0.5);margin:2px 0 0">Add to home screen</p></div><button onclick="installPWA()" style="background:#7c6af7;border:none;border-radius:8px;color:#fff;font-family:Syne,sans-serif;font-weight:600;font-size:13px;padding:8px 14px;cursor:pointer;white-space:nowrap;flex-shrink:0">Install</button><button onclick="this.parentElement.remove()" style="background:transparent;border:none;color:rgba(240,238,255,0.4);font-size:20px;cursor:pointer;padding:0 4px;flex-shrink:0">×</button>';
   document.body.appendChild(b);
 }
 
@@ -1056,20 +908,6 @@ if (isIOS && !window.navigator.standalone) {
     document.body.appendChild(b);
   }, 2500);
 }
-
-// auto-start camera on peer join screen
-document.getElementById('screen-peer-join').addEventListener('click', () => {}, { once: true });
-
-// Start peer camera when screen becomes active
-const origShow = window.showScreen;
-window.showScreen = function(id) {
-  origShow ? origShow(id) : null;
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
-  if (id === 'screen-peer-join') {
-    setTimeout(startPeerQRScan, 300);
-  }
-};
 </script>
 </body>
 </html>
