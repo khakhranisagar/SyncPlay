@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0a0a0f">
+<meta name="application-name" content="SyncPlay">
+<meta name="apple-mobile-web-app-title" content="SyncPlay">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link id="pwa-manifest" rel="manifest">
+<title>SyncPlay</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0f;
+    --bg2: #12121a;
+    --bg3: #1a1a26;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.15);
+    --text: #f0eeff;
+    --muted: rgba(240,238,255,0.45);
+    --accent: #7c6af7;
+    --accent2: #4fc9a4;
+    --accent3: #f76a6a;
+    --mono: 'DM Mono', monospace;
+    --display: 'Syne', sans-serif;
+  }
+
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--display); overflow: hidden; }
+
+  #app { height: 100vh; display: flex; flex-direction: column; }
+
+  /* ── SCREENS ── */
+  .screen { display: none; flex-direction: column; height: 100%; padding: 24px 20px; overflow-y: auto; }
+  .screen.active { display: flex; }
+
+  /* ── LANDING ── */
+  #screen-landing { align-items: center; justify-content: center; gap: 0; }
+  .logo-mark { width: 72px; height: 72px; border-radius: 20px; background: var(--bg3); border: 1px solid var(--border2); display: flex; align-items: center; justify-content: center; margin-bottom: 28px; position: relative; overflow: hidden; }
+  .logo-mark::before { content: ''; position: absolute; width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--accent); top: 16px; left: 16px; }
+  .logo-mark::after { content: ''; position: absolute; width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--accent2); top: 26px; left: 26px; }
+  .logo-wave { position: absolute; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); top: 33px; left: 33px; }
+  h1.brand { font-size: 36px; font-weight: 800; letter-spacing: -1px; margin-bottom: 8px; }
+  .tagline { font-size: 13px; color: var(--muted); font-family: var(--mono); letter-spacing: 0.04em; margin-bottom: 52px; }
+  .btn-group { width: 100%; display: flex; flex-direction: column; gap: 12px; }
+  .btn { width: 100%; padding: 18px; border-radius: 14px; border: 1px solid var(--border2); background: var(--bg3); color: var(--text); font-family: var(--display); font-size: 16px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: space-between; transition: all 0.15s; -webkit-tap-highlight-color: transparent; }
+  .btn:active { transform: scale(0.98); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.secondary { background: var(--bg3); }
+  .btn-icon { font-size: 20px; opacity: 0.7; }
+
+  /* ── SECTION HEADER ── */
+  .screen-header { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; flex-shrink: 0; }
+  .back-btn { width: 40px; height: 40px; border-radius: 10px; background: var(--bg3); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; flex-shrink: 0; -webkit-tap-highlight-color: transparent; }
+  .screen-title { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
+
+  /* ── STEP FLOW ── */
+  .step { display: none; flex-direction: column; flex: 1; }
+  .step.active { display: flex; }
+  .step-label { font-family: var(--mono); font-size: 11px; color: var(--accent); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 10px; }
+  .step-title { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 8px; line-height: 1.25; }
+  .step-sub { font-size: 13px; color: var(--muted); margin-bottom: 28px; line-height: 1.6; }
+
+  /* ── FILE DROP ZONE ── */
+  .file-zone { border: 1.5px dashed var(--border2); border-radius: 16px; padding: 36px 20px; display: flex; flex-direction: column; align-items: center; gap: 12px; cursor: pointer; transition: all 0.2s; background: var(--bg2); flex: 1; justify-content: center; -webkit-tap-highlight-color: transparent; }
+  .file-zone:active { border-color: var(--accent); background: rgba(124,106,247,0.08); }
+  .file-zone.has-file { border-style: solid; border-color: var(--accent2); background: rgba(79,201,164,0.06); }
+  .file-icon { font-size: 40px; }
+  .file-zone-label { font-size: 15px; font-weight: 600; text-align: center; }
+  .file-zone-sub { font-size: 12px; color: var(--muted); text-align: center; font-family: var(--mono); }
+  input[type=file] { display: none; }
+
+  /* ── QR DISPLAY ── */
+  .qr-container { background: #fff; border-radius: 16px; padding: 16px; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; width: 200px; height: 200px; flex-shrink: 0; }
+  .instruction-box { background: var(--bg3); border-radius: 14px; padding: 16px; border: 1px solid var(--border); margin-bottom: 16px; }
+  .instruction-box p { font-size: 13px; color: var(--muted); line-height: 1.6; }
+  .instruction-box strong { color: var(--text); font-weight: 600; }
+
+  /* ── PEER LIST ── */
+  .peer-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+  .peer-item { background: var(--bg3); border-radius: 12px; padding: 14px 16px; border: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .peer-name { font-size: 14px; font-weight: 600; }
+  .peer-status { font-size: 11px; font-family: var(--mono); padding: 4px 10px; border-radius: 99px; }
+  .peer-status.ready { background: rgba(79,201,164,0.15); color: var(--accent2); }
+  .peer-status.waiting { background: rgba(240,238,255,0.07); color: var(--muted); }
+  .peer-status.syncing { background: rgba(124,106,247,0.15); color: var(--accent); }
+
+  /* ── PLAYER ── */
+  #screen-host-play, #screen-peer-play { padding: 0; }
+  .player-bg { flex: 1; background: var(--bg); display: flex; flex-direction: column; }
+  .video-area { background: #000; position: relative; width: 100%; aspect-ratio: 16/9; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+  video { width: 100%; height: 100%; object-fit: contain; }
+  .video-placeholder { text-align: center; }
+  .video-placeholder .big-icon { font-size: 48px; opacity: 0.2; }
+  .player-info { padding: 20px; border-bottom: 1px solid var(--border); }
+  .track-name { font-size: 16px; font-weight: 700; letter-spacing: -0.3px; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .track-meta { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+
+  /* ── PROGRESS BAR ── */
+  .progress-wrap { padding: 16px 20px 0; }
+  .progress-bar-container { position: relative; height: 4px; background: var(--bg3); border-radius: 99px; cursor: pointer; }
+  .progress-bar-fill { height: 4px; background: var(--accent); border-radius: 99px; pointer-events: none; width: 0%; transition: width 0.25s linear; }
+  .progress-thumb { position: absolute; top: -6px; width: 16px; height: 16px; border-radius: 50%; background: var(--accent); left: 0%; transform: translateX(-50%); pointer-events: none; }
+  .time-row { display: flex; justify-content: space-between; margin-top: 8px; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+  /* ── CONTROLS ── */
+  .controls { padding: 20px; display: flex; align-items: center; justify-content: center; gap: 24px; }
+  .ctrl-btn { width: 56px; height: 56px; border-radius: 50%; border: 1px solid var(--border2); background: var(--bg3); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 22px; -webkit-tap-highlight-color: transparent; transition: all 0.1s; }
+  .ctrl-btn:active { transform: scale(0.92); }
+  .ctrl-btn.play-btn { width: 72px; height: 72px; font-size: 26px; background: var(--accent); border-color: var(--accent); }
+  .ctrl-btn.play-btn:active { background: #6558e0; }
+
+  /* ── PEER LIST IN PLAYER ── */
+  .peers-strip { padding: 0 20px 16px; display: flex; gap: 10px; overflow-x: auto; }
+  .peer-dot { display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 52px; }
+  .peer-dot-circle { width: 36px; height: 36px; border-radius: 50%; background: var(--bg3); border: 1.5px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; }
+  .peer-dot-circle.live { border-color: var(--accent2); background: rgba(79,201,164,0.12); }
+  .peer-dot-label { font-size: 10px; color: var(--muted); font-family: var(--mono); }
+
+  /* ── PEER AUDIO ONLY ── */
+  .peer-audio-view { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 20px; gap: 20px; }
+  .vinyl { width: 180px; height: 180px; border-radius: 50%; background: var(--bg3); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; position: relative; }
+  .vinyl.spinning { animation: spin 4s linear infinite; }
+  .vinyl-label { width: 70px; height: 70px; border-radius: 50%; background: var(--bg2); border: 1px solid var(--border); position: absolute; display: flex; align-items: center; justify-content: center; font-size: 9px; font-family: var(--mono); color: var(--muted); text-align: center; }
+  .vinyl-grooves { position: absolute; width: 140px; height: 140px; border-radius: 50%; border: 1px solid var(--border); }
+  .vinyl-grooves2 { position: absolute; width: 110px; height: 110px; border-radius: 50%; border: 1px solid var(--border); }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  .peer-now-playing { text-align: center; }
+  .peer-now-playing .track-name { font-size: 18px; font-weight: 700; }
+  .peer-now-playing .track-meta { margin-top: 4px; }
+  .peer-status-badge { font-family: var(--mono); font-size: 12px; padding: 8px 20px; border-radius: 99px; background: var(--bg3); border: 1px solid var(--border); color: var(--muted); }
+  .peer-status-badge.playing { background: rgba(79,201,164,0.15); border-color: rgba(79,201,164,0.3); color: var(--accent2); }
+
+  /* ── CODE INPUT ── */
+  .code-input-wrap { background: var(--bg3); border-radius: 14px; border: 1px solid var(--border2); padding: 16px; margin-bottom: 20px; }
+  .code-input-wrap textarea { width: 100%; background: transparent; border: none; outline: none; color: var(--text); font-family: var(--mono); font-size: 11px; resize: none; height: 80px; line-height: 1.5; }
+  .code-input-wrap label { font-size: 11px; font-family: var(--mono); color: var(--muted); display: block; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.08em; }
+
+  /* ── TOAST ── */
+  #toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--bg3); border: 1px solid var(--border2); border-radius: 99px; padding: 12px 24px; font-size: 13px; font-family: var(--mono); white-space: nowrap; transition: transform 0.3s ease; z-index: 999; pointer-events: none; }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* ── SCAN QR SCREEN ── */
+  #qr-reader-container { width: 100%; aspect-ratio: 1; border-radius: 16px; overflow: hidden; background: #000; margin-bottom: 16px; position: relative; }
+  #qr-reader-container video { width: 100%; height: 100%; object-fit: cover; }
+  .scan-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+  .scan-frame { width: 180px; height: 180px; border-radius: 16px; border: 2px solid var(--accent); box-shadow: 0 0 0 9999px rgba(0,0,0,0.5); }
+
+  /* ── UTILS ── */
+  .spacer { flex: 1; }
+  .mt-auto { margin-top: auto; }
+  .mt16 { margin-top: 16px; }
+  .mt24 { margin-top: 24px; }
+  .w100 { width: 100%; }
+  .text-success { color: var(--accent2); }
+  .text-muted { color: var(--muted); font-family: var(--mono); font-size: 12px; }
+  .hidden { display: none !important; }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ══════════════════════════════════
+     LANDING
+══════════════════════════════════ -->
+<div id="screen-landing" class="screen active">
+  <div class="logo-mark"><div class="logo-wave"></div></div>
+  <h1 class="brand">SyncPlay</h1>
+  <p class="tagline">// synchronized media · same wifi</p>
+  <div class="btn-group">
+    <button class="btn primary" onclick="showScreen('screen-host-setup')">
+      <span>Create a room</span>
+      <span class="btn-icon">⊕</span>
+    </button>
+    <button class="btn secondary" onclick="showScreen('screen-peer-join')">
+      <span>Join a room</span>
+      <span class="btn-icon">→</span>
+    </button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     HOST SETUP FLOW
+══════════════════════════════════ -->
+<div id="screen-host-setup" class="screen">
+  <div class="screen-header">
+    <div class="back-btn" onclick="showScreen('screen-landing')">←</div>
+    <span class="screen-title">Create room</span>
+  </div>
+
+  <!-- Step 1: Pick file -->
+  <div id="host-step-1" class="step active">
+    <p class="step-label">Step 1 of 3</p>
+    <h2 class="step-title">Select your media file</h2>
+    <p class="step-sub">Pick the MKV, MP4, or MP3 from your device. Peers will select the same file on their devices.</p>
+    <label class="file-zone" id="host-file-zone" for="host-file-input">
+      <span class="file-icon" id="host-file-icon">📂</span>
+      <span class="file-zone-label" id="host-file-label">Tap to select file</span>
+      <span class="file-zone-sub" id="host-file-sub">MKV · MP4 · MP3 · AAC · any size</span>
+    </label>
+    <input type="file" id="host-file-input" accept="video/*,audio/*,.mkv,.mp4,.mp3,.aac,.m4v,.webm">
+    <button class="btn primary mt24" id="host-step1-next" style="display:none" onclick="hostGoStep2()">
+      <span>Continue</span><span class="btn-icon">→</span>
+    </button>
+  </div>
+
+  <!-- Step 2: Share QR -->
+  <div id="host-step-2" class="step">
+    <p class="step-label">Step 2 of 3</p>
+    <h2 class="step-title">Invite peers</h2>
+    <p class="step-sub">Show this QR to each peer device. They'll scan it to connect directly over WiFi.</p>
+    <div class="qr-container" id="host-qr-display"></div>
+    <div class="instruction-box">
+      <p><strong>How it works:</strong> The QR contains a WebRTC offer. After scanning, each peer's device generates an answer — they'll show you a QR to scan back.</p>
+    </div>
+    <div id="host-peer-list" class="peer-list"></div>
+    <div class="spacer"></div>
+    <button class="btn primary" id="host-step2-next" onclick="hostGoStep3()" disabled>
+      <span id="host-step2-btn-text">Waiting for peers…</span><span class="btn-icon">→</span>
+    </button>
+    <div id="host-answer-section" class="mt16">
+      <div class="code-input-wrap">
+        <label>Paste peer answer here (or scan their QR)</label>
+        <textarea id="host-answer-input" placeholder="Paste the base64 answer from peer…"></textarea>
+      </div>
+      <button class="btn secondary" onclick="hostAcceptAnswer()">
+        <span>Accept peer answer</span><span class="btn-icon">✓</span>
+      </button>
+      <button class="btn secondary mt16" id="host-scan-answer-btn" onclick="startScanForHost()">
+        <span>Scan peer's QR instead</span><span class="btn-icon">📷</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Step 3: Wait for peers ready -->
+  <div id="host-step-3" class="step">
+    <p class="step-label">Step 3 of 3</p>
+    <h2 class="step-title">Waiting for peers</h2>
+    <p class="step-sub">Peers are selecting their files. Once all are ready, you can start playback.</p>
+    <div id="host-ready-list" class="peer-list"></div>
+    <div class="spacer"></div>
+    <button class="btn primary" id="host-launch-btn" onclick="launchHostPlayer()" disabled>
+      <span id="host-launch-text">Waiting…</span><span class="btn-icon">▶</span>
+    </button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     HOST PLAYER
+══════════════════════════════════ -->
+<div id="screen-host-play" class="screen">
+  <div class="player-bg">
+    <div class="video-area" id="host-video-area">
+      <video id="host-video" playsinline></video>
+    </div>
+    <div class="player-info">
+      <p class="track-name" id="host-track-name">—</p>
+      <p class="track-meta" id="host-track-meta">00:00 · select file to begin</p>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-bar-container" id="host-progress-container" onclick="hostSeek(event)">
+        <div class="progress-bar-fill" id="host-progress-fill"></div>
+        <div class="progress-thumb" id="host-progress-thumb"></div>
+      </div>
+      <div class="time-row">
+        <span id="host-time-cur">0:00</span>
+        <span id="host-time-dur">0:00</span>
+      </div>
+    </div>
+    <div class="controls">
+      <div class="ctrl-btn" onclick="hostSkip(-10)">⏪</div>
+      <div class="ctrl-btn play-btn" id="host-play-btn" onclick="hostTogglePlay()">▶</div>
+      <div class="ctrl-btn" onclick="hostSkip(10)">⏩</div>
+    </div>
+    <div class="peers-strip" id="host-peers-strip"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     PEER JOIN FLOW
+══════════════════════════════════ -->
+<div id="screen-peer-join" class="screen">
+  <div class="screen-header">
+    <div class="back-btn" onclick="showScreen('screen-landing')">←</div>
+    <span class="screen-title">Join room</span>
+  </div>
+
+  <!-- Step 1: Scan host QR -->
+  <div id="peer-step-1" class="step active">
+    <p class="step-label">Step 1 of 3</p>
+    <h2 class="step-title">Scan host QR</h2>
+    <p class="step-sub">Point your camera at the host's QR code to connect.</p>
+    <div id="qr-reader-container">
+      <video id="qr-video" autoplay muted playsinline></video>
+      <div class="scan-overlay"><div class="scan-frame"></div></div>
+    </div>
+    <div class="instruction-box">
+      <p><strong>No camera?</strong> Paste the connection code below instead.</p>
+    </div>
+    <div class="code-input-wrap">
+      <label>Or paste host offer code</label>
+      <textarea id="peer-offer-input" placeholder="Paste base64 offer from host…"></textarea>
+    </div>
+    <button class="btn primary" onclick="peerAcceptOffer()">
+      <span>Connect to host</span><span class="btn-icon">→</span>
+    </button>
+  </div>
+
+  <!-- Step 2: Show answer QR -->
+  <div id="peer-step-2" class="step">
+    <p class="step-label">Step 2 of 3</p>
+    <h2 class="step-title">Show this to host</h2>
+    <p class="step-sub">The host scans your QR (or paste the code) to complete the handshake.</p>
+    <div class="qr-container" id="peer-answer-qr"></div>
+    <div class="code-input-wrap mt16">
+      <label>Or copy this answer code</label>
+      <textarea id="peer-answer-out" readonly style="height:60px;cursor:pointer" onclick="copyAnswerCode()"></textarea>
+    </div>
+    <p class="text-muted" style="text-align:center;margin:8px 0">Waiting for host to accept…</p>
+    <div id="peer-connected-indicator" class="hidden text-success" style="text-align:center;font-weight:600;margin:12px 0">✓ Connected to host!</div>
+    <button class="btn primary mt24 hidden" id="peer-step2-next" onclick="peerGoStep3()">
+      <span>Select my file</span><span class="btn-icon">→</span>
+    </button>
+  </div>
+
+  <!-- Step 3: Select file -->
+  <div id="peer-step-3" class="step">
+    <p class="step-label">Step 3 of 3</p>
+    <h2 class="step-title">Select the same file</h2>
+    <p class="step-sub">Pick the exact same media file from your device storage. A fingerprint will confirm it matches.</p>
+    <label class="file-zone" id="peer-file-zone" for="peer-file-input">
+      <span class="file-icon" id="peer-file-icon">📂</span>
+      <span class="file-zone-label" id="peer-file-label">Tap to select file</span>
+      <span class="file-zone-sub" id="peer-file-sub">Same MKV / MP4 / MP3 as host</span>
+    </label>
+    <input type="file" id="peer-file-input" accept="video/*,audio/*,.mkv,.mp4,.mp3,.aac,.m4v,.webm">
+    <button class="btn primary mt24 hidden" id="peer-step3-next" onclick="peerSendReady()">
+      <span>I'm ready</span><span class="btn-icon">▶</span>
+    </button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     PEER PLAYER (Audio only)
+══════════════════════════════════ -->
+<div id="screen-peer-play" class="screen">
+  <div class="screen-header" style="padding:24px 20px 0">
+    <div class="back-btn" onclick="showScreen('screen-landing')">←</div>
+    <span class="screen-title">Now playing</span>
+  </div>
+  <div class="peer-audio-view">
+    <div class="vinyl" id="peer-vinyl">
+      <div class="vinyl-grooves"></div>
+      <div class="vinyl-grooves2"></div>
+      <div class="vinyl-label">SYNC<br>PLAY</div>
+    </div>
+    <div class="peer-now-playing">
+      <p class="track-name" id="peer-track-name">—</p>
+      <p class="track-meta" id="peer-track-meta">waiting for host…</p>
+    </div>
+    <span class="peer-status-badge" id="peer-status-badge">⏳ waiting for host</span>
+  </div>
+  <div style="padding:0 20px 32px">
+    <div class="progress-bar-container" style="margin-bottom:8px">
+      <div class="progress-bar-fill" id="peer-progress-fill"></div>
+    </div>
+    <div class="time-row">
+      <span id="peer-time-cur">0:00</span>
+      <span id="peer-time-dur">0:00</span>
+    </div>
+  </div>
+  <video id="peer-video" style="display:none" playsinline></video>
+</div>
+
+<!-- ══════════════════════════════════
+     SCAN (host scanning peer answer)
+══════════════════════════════════ -->
+<div id="screen-host-scan" class="screen">
+  <div class="screen-header">
+    <div class="back-btn" onclick="stopHostScan()">←</div>
+    <span class="screen-title">Scan peer QR</span>
+  </div>
+  <div id="host-qr-reader-container" style="width:100%;aspect-ratio:1;border-radius:16px;overflow:hidden;background:#000;position:relative">
+    <video id="host-scan-video" autoplay muted playsinline style="width:100%;height:100%;object-fit:cover"></video>
+    <div class="scan-overlay"><div class="scan-frame"></div></div>
+  </div>
+  <p class="step-sub mt24">Point camera at the peer's answer QR code</p>
+</div>
+
+</div><!-- /app -->
+<div id="toast">✓ Done</div>
+
+<script>
+// ══════════════════════════════════════════════════════
+//  GLOBALS
+// ══════════════════════════════════════════════════════
+const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
+let hostPeerConnections = [];   // array of {pc, dc, id, name, ready}
+let peerPC = null;              // peer's single RTCPeerConnection
+let peerDC = null;              // peer's DataChannel
+let hostFile = null;
+let peerFile = null;
+let hostVideo = null;
+let peerVideoEl = null;
+let isHostPlaying = false;
+let clockOffset = 0;            // ms diff between local and host clock
+let driftTimer = null;
+let peerScanStream = null;
+let hostScanStream = null;
+let peerQRInterval = null;
+let hostQRInterval = null;
+let peerCount = 0;
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function showStep(prefix, n) {
+  document.querySelectorAll(`[id^="${prefix}-step-"]`).forEach(s => s.classList.remove('active'));
+  document.getElementById(`${prefix}-step-${n}`).classList.add('active');
+}
+
+function toast(msg, dur=2200) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), dur);
+}
+
+function fmt(s) {
+  s = Math.floor(s || 0);
+  return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+}
+
+function b64e(str) { return btoa(str); }
+function b64d(str) { return atob(str); }
+function encObj(obj) { return b64e(JSON.stringify(obj)); }
+function decObj(str) { try { return JSON.parse(b64d(str.trim())); } catch(e) { return null; } }
+
+// ══════════════════════════════════════════════════════
+//  HOST SETUP
+// ══════════════════════════════════════════════════════
+document.getElementById('host-file-input').addEventListener('change', function(e) {
+  const f = e.target.files[0];
+  if (!f) return;
+  hostFile = f;
+  document.getElementById('host-file-icon').textContent = '🎬';
+  document.getElementById('host-file-label').textContent = f.name;
+  document.getElementById('host-file-sub').textContent = (f.size/(1024*1024)).toFixed(1) + ' MB · ' + f.type.split('/')[1];
+  document.getElementById('host-file-zone').classList.add('has-file');
+  document.getElementById('host-step1-next').style.display = 'flex';
+});
+
+async function hostGoStep2() {
+  showStep('host', 2);
+  await createHostPeerSlot();
+}
+
+async function createHostPeerSlot() {
+  peerCount++;
+  const peerId = 'peer-' + peerCount;
+  const peerName = 'Device ' + peerCount;
+
+  const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+  const dc = pc.createDataChannel('sync', { ordered: true });
+
+  const slot = { pc, dc, id: peerId, name: peerName, ready: false };
+  hostPeerConnections.push(slot);
+
+  setupHostDataChannel(slot);
+
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+
+  await new Promise(resolve => {
+    if (pc.iceGatheringState === 'complete') { resolve(); return; }
+    pc.addEventListener('icegatheringstatechange', () => {
+      if (pc.iceGatheringState === 'complete') resolve();
+    });
+    setTimeout(resolve, 3000);
+  });
+
+  const encoded = encObj(pc.localDescription);
+  renderHostQR(encoded);
+  renderHostPeerList();
+  return { pc, dc, slot, encoded };
+}
+
+function renderHostQR(encoded) {
+  const container = document.getElementById('host-qr-display');
+  container.innerHTML = '';
+  new QRCode(container, {
+    text: encoded,
+    width: 168,
+    height: 168,
+    colorDark: '#000',
+    colorLight: '#fff',
+    correctLevel: QRCode.CorrectLevel.M
+  });
+}
+
+function renderHostPeerList() {
+  const list = document.getElementById('host-peer-list');
+  list.innerHTML = hostPeerConnections.map(p => `
+    <div class="peer-item">
+      <span class="peer-name">${p.name}</span>
+      <span class="peer-status ${p.pc.connectionState === 'connected' ? 'ready' : 'waiting'}">
+        ${p.pc.connectionState === 'connected' ? 'connected' : 'awaiting…'}
+      </span>
+    </div>
+  `).join('');
+}
+
+async function hostAcceptAnswer() {
+  const raw = document.getElementById('host-answer-input').value.trim();
+  if (!raw) { toast('⚠ Paste an answer code first'); return; }
+  const desc = decObj(raw);
+  if (!desc) { toast('⚠ Invalid code'); return; }
+  const slot = hostPeerConnections[hostPeerConnections.length - 1];
+  try {
+    await slot.pc.setRemoteDescription(new RTCSessionDescription(desc));
+    toast('✓ Handshake complete');
+    document.getElementById('host-answer-input').value = '';
+    renderHostPeerList();
+    const btn = document.getElementById('host-step2-next');
+    btn.disabled = false;
+    document.getElementById('host-step2-btn-text').textContent = 'Continue to room →';
+  } catch(e) {
+    toast('⚠ Failed: ' + e.message);
+  }
+}
+
+function setupHostDataChannel(slot) {
+  slot.dc.onopen = () => {
+    renderHostPeerList();
+    renderHostPeersStrip();
+    startClockSync(slot);
+  };
+  slot.dc.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.type === 'ready') {
+      slot.ready = true;
+      slot.fileName = msg.fileName;
+      renderReadyList();
+      checkAllReady();
+    }
+    if (msg.type === 'pong') {
+      const rtt = Date.now() - msg.t;
+      slot.clockOffset = rtt / 2;
+    }
+  };
+  slot.dc.onerror = (e) => console.warn('DC error', e);
+}
+
+function startClockSync(slot) {
+  function ping() {
+    if (slot.dc.readyState === 'open') {
+      slot.dc.send(JSON.stringify({ type: 'ping', t: Date.now() }));
+    }
+  }
+  ping();
+  setTimeout(ping, 500);
+  setTimeout(ping, 1200);
+}
+
+function renderReadyList() {
+  const list = document.getElementById('host-ready-list');
+  list.innerHTML = hostPeerConnections.map(p => `
+    <div class="peer-item">
+      <div>
+        <p class="peer-name">${p.name}</p>
+        ${p.fileName ? `<p class="text-muted">${p.fileName}</p>` : ''}
+      </div>
+      <span class="peer-status ${p.ready ? 'ready' : 'waiting'}">${p.ready ? '✓ ready' : 'selecting…'}</span>
+    </div>
+  `).join('');
+}
+
+function checkAllReady() {
+  const allReady = hostPeerConnections.length > 0 && hostPeerConnections.every(p => p.ready);
+  const btn = document.getElementById('host-launch-btn');
+  btn.disabled = !allReady;
+  document.getElementById('host-launch-text').textContent = allReady ? 'Launch playback' : 'Waiting for peers…';
+}
+
+function hostGoStep3() {
+  showStep('host', 3);
+  renderReadyList();
+  checkAllReady();
+}
+
+function launchHostPlayer() {
+  if (!hostFile) return;
+  showScreen('screen-host-play');
+  hostVideo = document.getElementById('host-video');
+  hostVideo.src = URL.createObjectURL(hostFile);
+  document.getElementById('host-track-name').textContent = hostFile.name;
+  hostVideo.addEventListener('timeupdate', updateHostProgress);
+  hostVideo.addEventListener('loadedmetadata', () => {
+    document.getElementById('host-time-dur').textContent = fmt(hostVideo.duration);
+    document.getElementById('host-track-meta').textContent = fmt(hostVideo.duration) + ' · ' + (hostFile.size/(1024*1024)).toFixed(1) + ' MB';
+  });
+  broadcastToAll({ type: 'file_info', name: hostFile.name, size: hostFile.size });
+  renderHostPeersStrip();
+  startDriftCorrection();
+}
+
+function renderHostPeersStrip() {
+  const strip = document.getElementById('host-peers-strip');
+  strip.innerHTML = hostPeerConnections.map(p => `
+    <div class="peer-dot">
+      <div class="peer-dot-circle ${p.dc && p.dc.readyState==='open' ? 'live' : ''}">${p.name.slice(-1)}</div>
+      <span class="peer-dot-label">${p.name.split(' ')[1] || p.name}</span>
+    </div>
+  `).join('');
+}
+
+function broadcastToAll(msg) {
+  const data = JSON.stringify(msg);
+  hostPeerConnections.forEach(p => {
+    if (p.dc && p.dc.readyState === 'open') p.dc.send(data);
+  });
+}
+
+function updateHostProgress() {
+  const v = hostVideo;
+  if (!v.duration) return;
+  const pct = (v.currentTime / v.duration) * 100;
+  document.getElementById('host-progress-fill').style.width = pct + '%';
+  document.getElementById('host-progress-thumb').style.left = pct + '%';
+  document.getElementById('host-time-cur').textContent = fmt(v.currentTime);
+  document.getElementById('host-time-dur').textContent = fmt(v.duration);
+}
+
+function hostTogglePlay() {
+  if (!hostVideo) return;
+  if (isHostPlaying) {
+    hostVideo.pause();
+    isHostPlaying = false;
+    document.getElementById('host-play-btn').textContent = '▶';
+    broadcastToAll({ type: 'pause', position: hostVideo.currentTime, t: Date.now() });
+  } else {
+    const playAt = Date.now() + 300;
+    hostVideo.play();
+    isHostPlaying = true;
+    document.getElementById('host-play-btn').textContent = '⏸';
+    broadcastToAll({ type: 'play', position: hostVideo.currentTime, playAt });
+  }
+}
+
+function hostSkip(secs) {
+  if (!hostVideo) return;
+  hostVideo.currentTime = Math.max(0, hostVideo.currentTime + secs);
+  broadcastToAll({ type: 'seek', position: hostVideo.currentTime, t: Date.now() });
+}
+
+function hostSeek(e) {
+  if (!hostVideo || !hostVideo.duration) return;
+  const rect = e.currentTarget.getBoundingClientRect();
+  const pct = (e.clientX - rect.left) / rect.width;
+  const pos = pct * hostVideo.duration;
+  hostVideo.currentTime = pos;
+  broadcastToAll({ type: 'seek', position: pos, t: Date.now() });
+}
+
+function startDriftCorrection() {
+  driftTimer = setInterval(() => {
+    if (!hostVideo || !isHostPlaying) return;
+    broadcastToAll({ type: 'drift_check', position: hostVideo.currentTime, t: Date.now() });
+  }, 8000);
+}
+
+// ══════════════════════════════════════════════════════
+//  PEER JOIN
+// ══════════════════════════════════════════════════════
+async function startPeerQRScan() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    peerScanStream = stream;
+    document.getElementById('qr-video').srcObject = stream;
+    peerQRInterval = setInterval(() => scanFrameForQR('qr-video', handleHostQR), 500);
+  } catch(e) {
+    toast('Camera unavailable, use paste instead');
+  }
+}
+
+function stopPeerScan() {
+  if (peerScanStream) { peerScanStream.getTracks().forEach(t => t.stop()); peerScanStream = null; }
+  if (peerQRInterval) { clearInterval(peerQRInterval); peerQRInterval = null; }
+}
+
+async function peerAcceptOffer() {
+  let raw = document.getElementById('peer-offer-input').value.trim();
+  if (!raw) { toast('⚠ Paste offer code or scan QR'); return; }
+  await processHostOffer(raw);
+}
+
+async function processHostOffer(raw) {
+  const desc = decObj(raw);
+  if (!desc) { toast('⚠ Invalid offer code'); return; }
+  stopPeerScan();
+
+  peerPC = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+
+  peerPC.ondatachannel = (e) => {
+    peerDC = e.channel;
+    setupPeerDataChannel();
+  };
+
+  await peerPC.setRemoteDescription(new RTCSessionDescription(desc));
+  const answer = await peerPC.createAnswer();
+  await peerPC.setLocalDescription(answer);
+
+  await new Promise(resolve => {
+    if (peerPC.iceGatheringState === 'complete') { resolve(); return; }
+    peerPC.addEventListener('icegatheringstatechange', () => {
+      if (peerPC.iceGatheringState === 'complete') resolve();
+    });
+    setTimeout(resolve, 3000);
+  });
+
+  const encoded = encObj(peerPC.localDescription);
+  showStep('peer', 2);
+
+  // show answer QR
+  const container = document.getElementById('peer-answer-qr');
+  container.innerHTML = '';
+  new QRCode(container, { text: encoded, width: 168, height: 168, colorDark: '#000', colorLight: '#fff', correctLevel: QRCode.CorrectLevel.M });
+
+  document.getElementById('peer-answer-out').value = encoded;
+  toast('✓ Answer generated — show to host');
+}
+
+function setupPeerDataChannel() {
+  peerDC.onopen = () => {
+    document.getElementById('peer-connected-indicator').classList.remove('hidden');
+    document.getElementById('peer-step2-next').classList.remove('hidden');
+    toast('✓ Connected to host!');
+  };
+
+  peerDC.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.type === 'ping') {
+      peerDC.send(JSON.stringify({ type: 'pong', t: msg.t }));
+    }
+    if (msg.type === 'file_info') {
+      document.getElementById('peer-track-name').textContent = msg.name;
+    }
+    if (msg.type === 'play') {
+      handleSyncPlay(msg);
+    }
+    if (msg.type === 'pause') {
+      handleSyncPause(msg);
+    }
+    if (msg.type === 'seek') {
+      handleSyncSeek(msg);
+    }
+    if (msg.type === 'drift_check') {
+      handleDriftCheck(msg);
+    }
+  };
+}
+
+function copyAnswerCode() {
+  const val = document.getElementById('peer-answer-out').value;
+  navigator.clipboard.writeText(val).then(() => toast('✓ Copied!'));
+}
+
+function peerGoStep3() {
+  showStep('peer', 3);
+}
+
+document.getElementById('peer-file-input').addEventListener('change', function(e) {
+  const f = e.target.files[0];
+  if (!f) return;
+  peerFile = f;
+  document.getElementById('peer-file-icon').textContent = '🎬';
+  document.getElementById('peer-file-label').textContent = f.name;
+  document.getElementById('peer-file-sub').textContent = (f.size/(1024*1024)).toFixed(1) + ' MB';
+  document.getElementById('peer-file-zone').classList.add('has-file');
+  document.getElementById('peer-step3-next').classList.remove('hidden');
+});
+
+function peerSendReady() {
+  if (!peerFile || !peerDC || peerDC.readyState !== 'open') {
+    toast('⚠ Not connected yet'); return;
+  }
+  peerDC.send(JSON.stringify({ type: 'ready', fileName: peerFile.name }));
+  peerVideoEl = document.getElementById('peer-video');
+  peerVideoEl.src = URL.createObjectURL(peerFile);
+  peerVideoEl.muted = false;
+  peerVideoEl.load();
+  document.getElementById('peer-track-name').textContent = peerFile.name;
+  document.getElementById('peer-track-meta').textContent = (peerFile.size/(1024*1024)).toFixed(1) + ' MB · loaded';
+  peerVideoEl.addEventListener('loadedmetadata', () => {
+    document.getElementById('peer-time-dur').textContent = fmt(peerVideoEl.duration);
+  });
+  showScreen('screen-peer-play');
+  toast('✓ Ready! Waiting for host to play…');
+}
+
+// ══════════════════════════════════════════════════════
+//  PEER SYNC HANDLERS
+// ══════════════════════════════════════════════════════
+function handleSyncPlay(msg) {
+  if (!peerVideoEl) return;
+  peerVideoEl.currentTime = msg.position;
+  const delay = Math.max(0, msg.playAt - Date.now() - clockOffset);
+  setTimeout(() => {
+    peerVideoEl.play().catch(() => {});
+    document.getElementById('peer-vinyl').classList.add('spinning');
+    document.getElementById('peer-status-badge').textContent = '▶ playing';
+    document.getElementById('peer-status-badge').classList.add('playing');
+    startPeerProgressUpdate();
+  }, delay);
+}
+
+function handleSyncPause(msg) {
+  if (!peerVideoEl) return;
+  peerVideoEl.pause();
+  peerVideoEl.currentTime = msg.position;
+  document.getElementById('peer-vinyl').classList.remove('spinning');
+  document.getElementById('peer-status-badge').textContent = '⏸ paused';
+  document.getElementById('peer-status-badge').classList.remove('playing');
+}
+
+function handleSyncSeek(msg) {
+  if (!peerVideoEl) return;
+  peerVideoEl.currentTime = msg.position;
+}
+
+function handleDriftCheck(msg) {
+  if (!peerVideoEl || peerVideoEl.paused) return;
+  const expectedPos = msg.position + (Date.now() - msg.t) / 1000;
+  const drift = Math.abs(peerVideoEl.currentTime - expectedPos);
+  if (drift > 0.3) {
+    peerVideoEl.currentTime = expectedPos;
+    toast(`⚡ Resync (${drift.toFixed(2)}s drift)`);
+  }
+}
+
+let peerProgressTimer = null;
+function startPeerProgressUpdate() {
+  if (peerProgressTimer) return;
+  peerProgressTimer = setInterval(() => {
+    if (!peerVideoEl || !peerVideoEl.duration) return;
+    const pct = (peerVideoEl.currentTime / peerVideoEl.duration) * 100;
+    document.getElementById('peer-progress-fill').style.width = pct + '%';
+    document.getElementById('peer-time-cur').textContent = fmt(peerVideoEl.currentTime);
+    document.getElementById('peer-time-dur').textContent = fmt(peerVideoEl.duration);
+  }, 500);
+}
+
+// ══════════════════════════════════════════════════════
+//  QR SCANNING (jsQR)
+// ══════════════════════════════════════════════════════
+function scanFrameForQR(videoId, callback) {
+  const video = document.getElementById(videoId);
+  if (!video || video.readyState < 2) return;
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0);
+  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  if (window.jsQR) {
+    const code = jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: 'dontInvert' });
+    if (code && code.data) callback(code.data);
+  }
+}
+
+function handleHostQR(data) {
+  clearInterval(peerQRInterval);
+  stopPeerScan();
+  document.getElementById('peer-offer-input').value = data;
+  processHostOffer(data);
+}
+
+async function startScanForHost() {
+  showScreen('screen-host-scan');
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    hostScanStream = stream;
+    document.getElementById('host-scan-video').srcObject = stream;
+    hostQRInterval = setInterval(() => scanFrameForQR('host-scan-video', handlePeerAnswerQR), 500);
+  } catch(e) {
+    toast('Camera unavailable'); stopHostScan();
+  }
+}
+
+function stopHostScan() {
+  if (hostScanStream) { hostScanStream.getTracks().forEach(t => t.stop()); hostScanStream = null; }
+  if (hostQRInterval) { clearInterval(hostQRInterval); hostQRInterval = null; }
+  showScreen('screen-host-setup');
+  showStep('host', 2);
+}
+
+async function handlePeerAnswerQR(data) {
+  clearInterval(hostQRInterval);
+  stopHostScan();
+  const desc = decObj(data);
+  if (!desc) { toast('⚠ Invalid QR'); return; }
+  const slot = hostPeerConnections[hostPeerConnections.length - 1];
+  try {
+    await slot.pc.setRemoteDescription(new RTCSessionDescription(desc));
+    toast('✓ Peer connected via QR!');
+    renderHostPeerList();
+    showScreen('screen-host-setup');
+    showStep('host', 2);
+    document.getElementById('host-step2-next').disabled = false;
+    document.getElementById('host-step2-btn-text').textContent = 'Continue to room →';
+  } catch(e) {
+    toast('⚠ ' + e.message);
+  }
+}
+
+// load jsQR from CDN
+const jsQRScript = document.createElement('script');
+jsQRScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.min.js';
+document.head.appendChild(jsQRScript);
+
+// ══════════════════════════════════════════════════════
+//  PWA — MANIFEST + SERVICE WORKER (inlined as blobs)
+// ══════════════════════════════════════════════════════
+
+const iconSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="112" fill="#0a0a0f"/><circle cx="256" cy="256" r="140" fill="none" stroke="#7c6af7" stroke-width="18"/><circle cx="256" cy="256" r="90" fill="none" stroke="#4fc9a4" stroke-width="12"/><circle cx="256" cy="256" r="40" fill="none" stroke="#7c6af7" stroke-width="8"/><circle cx="256" cy="256" r="14" fill="#7c6af7"/><polygon points="240,232 240,280 284,256" fill="#fff"/></svg>`;
+const iconDataURI = 'data:image/svg+xml;base64,' + btoa(iconSVG);
+
+const appleIcon = document.createElement('link');
+appleIcon.rel = 'apple-touch-icon';
+appleIcon.href = iconDataURI;
+document.head.appendChild(appleIcon);
+
+const manifest = {
+  name: 'SyncPlay',
+  short_name: 'SyncPlay',
+  description: 'Synchronized media player over WiFi',
+  start_url: './',
+  display: 'standalone',
+  orientation: 'portrait',
+  background_color: '#0a0a0f',
+  theme_color: '#0a0a0f',
+  categories: ['entertainment','utilities'],
+  icons: [
+    { src: iconDataURI, sizes: '192x192', type: 'image/svg+xml', purpose: 'any maskable' },
+    { src: iconDataURI, sizes: '512x512', type: 'image/svg+xml', purpose: 'any maskable' }
+  ]
+};
+const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+document.getElementById('pwa-manifest').href = URL.createObjectURL(manifestBlob);
+
+const swCode = `
+const CACHE='syncplay-v1';
+self.addEventListener('install',e=>{self.skipWaiting();});
+self.addEventListener('activate',e=>{e.waitUntil(clients.claim());});
+self.addEventListener('fetch',e=>{
+  e.respondWith(caches.match(e.request).then(c=>c||fetch(e.request).catch(()=>
+    new Response('Open SyncPlay while online first.',{headers:{'Content-Type':'text/plain'}})
+  )));
+});`;
+const swBlob = new Blob([swCode], { type: 'application/javascript' });
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register(URL.createObjectURL(swBlob))
+    .then(r => console.log('[SyncPlay] SW registered'))
+    .catch(e => console.warn('[SyncPlay] SW needs HTTPS or localhost:', e.message));
+}
+
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  showInstallBanner();
+});
+
+function showInstallBanner() {
+  if (document.getElementById('install-banner')) return;
+  const b = document.createElement('div');
+  b.id = 'install-banner';
+  b.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1a26;border:1px solid rgba(124,106,247,0.4);border-radius:14px;padding:14px 20px;display:flex;align-items:center;gap:14px;font-family:Syne,sans-serif;font-size:14px;color:#f0eeff;z-index:9999;box-shadow:0 8px 32px rgba(0,0,0,0.6);max-width:calc(100vw - 40px);';
+  b.innerHTML = '<span style="font-size:22px">📲</span><div><p style="font-weight:600;margin:0">Install SyncPlay</p><p style="font-size:12px;color:rgba(240,238,255,0.5);margin:2px 0 0">Add to home screen for best experience</p></div><button onclick="installPWA()" style="background:#7c6af7;border:none;border-radius:8px;color:#fff;font-family:Syne,sans-serif;font-weight:600;font-size:13px;padding:8px 14px;cursor:pointer;white-space:nowrap;flex-shrink:0">Install</button><button onclick="this.parentElement.remove()" style="background:transparent;border:none;color:rgba(240,238,255,0.4);font-size:20px;cursor:pointer;padding:0 4px;flex-shrink:0">×</button>';
+  document.body.appendChild(b);
+}
+
+function installPWA() {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  deferredInstallPrompt.userChoice.then(c => {
+    if (c.outcome === 'accepted') toast('✓ SyncPlay installed!');
+    deferredInstallPrompt = null;
+    const b = document.getElementById('install-banner'); if (b) b.remove();
+  });
+}
+
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+if (isIOS && !window.navigator.standalone) {
+  setTimeout(() => {
+    if (document.getElementById('install-banner')) return;
+    const b = document.createElement('div');
+    b.id = 'install-banner';
+    b.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1a26;border:1px solid rgba(124,106,247,0.4);border-radius:14px;padding:14px 18px;font-family:Syne,sans-serif;font-size:13px;color:#f0eeff;z-index:9999;max-width:calc(100vw - 40px);text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.6);';
+    b.innerHTML = '<p style="font-weight:600;margin:0 0 4px">Install on iOS</p><p style="color:rgba(240,238,255,0.55);margin:0;line-height:1.5">Tap <strong style="color:#f0eeff">Share ↑</strong> then <strong style="color:#f0eeff">"Add to Home Screen"</strong></p><button onclick="this.parentElement.remove()" style="margin-top:10px;background:transparent;border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:rgba(240,238,255,0.5);font-family:Syne,sans-serif;font-size:12px;padding:6px 16px;cursor:pointer">Dismiss</button>';
+    document.body.appendChild(b);
+  }, 2500);
+}
+
+// auto-start camera on peer join screen
+document.getElementById('screen-peer-join').addEventListener('click', () => {}, { once: true });
+
+// Start peer camera when screen becomes active
+const origShow = window.showScreen;
+window.showScreen = function(id) {
+  origShow ? origShow(id) : null;
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if (id === 'screen-peer-join') {
+    setTimeout(startPeerQRScan, 300);
+  }
+};
+</script>
+</body>
+</html>
