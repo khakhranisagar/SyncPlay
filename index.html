@@ -368,8 +368,8 @@ const ICE_SERVERS = [
 
 // Signaling: use a free public WebSocket relay (PieSocket public channel)
 // Each room gets a unique channel derived from the 4-digit code
-const WS_BASE = 'wss://free.blr2.piesocket.com/v3/';
-const WS_KEY  = 'oCdCMcMPQpKf7JNTTsDmYVMaB1hrQtrBmWG11MRonI8Fn9RFr87jKc8sYAm';
+// ← Replace this URL after deploying to Render
+const SIGNAL_URL = 'wss://YOUR-APP-NAME.onrender.com';
 
 let sigWS = null;
 let roomCode = null;
@@ -412,25 +412,13 @@ function genCode() {
   return String(Math.floor(1000 + Math.random() * 9000));
 }
 
-// ── Signaling via WebSocket relay ──────────────────────
-function sigConnect(code, role, onMsg) {
-  const channel = code + (role === 'host' ? '_h' : '_p');
-  const url = `${WS_BASE}${channel}?api_key=${WS_KEY}&notify_self=0`;
-  const ws = new WebSocket(url);
-  ws.onopen = () => {
-    console.log('[SyncPlay] Signaling connected', channel);
-    if (role === 'host') {
-      document.getElementById('host-sig-status').textContent = '✓ ready — share the code above';
-      document.getElementById('host-sig-status').style.color = 'var(--accent2)';
-    } else {
-      document.getElementById('peer-sig-status').textContent = '✓ relay connected';
-      document.getElementById('peer-sig-status').style.color = 'var(--accent2)';
-    }
-  };
+// ── Signaling via our Render server ───────────────────
+function sigConnect(onMsg) {
+  const ws = new WebSocket(SIGNAL_URL);
   ws.onmessage = e => {
     try { onMsg(JSON.parse(e.data)); } catch(err) { console.warn('sig msg parse err', err); }
   };
-  ws.onerror = err => console.warn('[SyncPlay] WS error', err);
+  ws.onerror = () => toast('⚠ Cannot reach signaling server');
   ws.onclose = () => console.log('[SyncPlay] WS closed');
   return ws;
 }
@@ -438,6 +426,11 @@ function sigConnect(code, role, onMsg) {
 function sigSend(ws, msg) {
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify(msg));
+  } else {
+    // Queue retry once
+    setTimeout(() => {
+      if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
+    }, 500);
   }
 }
 
@@ -461,28 +454,29 @@ async function hostGoStep2() {
   document.getElementById('host-room-code').textContent = roomCode;
   showStep('host', 2);
 
-  // Connect signaling on host channel
-  sigWS = sigConnect(roomCode, 'host', handleHostSigMsg);
+  sigWS = sigConnect(handleHostSigMsg);
+  sigWS.onopen = () => {
+    sigSend(sigWS, { type: 'host_create', code: roomCode });
+  };
 }
 
 async function handleHostSigMsg(msg) {
   console.log('[Host] sig msg:', msg.type);
-  if (msg.type === 'join') {
-    // Peer wants to join — create a peer slot and send offer
+  if (msg.type === 'hosting') {
+    document.getElementById('host-sig-status').textContent = '✓ ready — share the code above';
+    document.getElementById('host-sig-status').style.color = 'var(--accent2)';
+  }
+  if (msg.type === 'peer_joined') {
     await createHostPeerSlot(msg.peerId);
   }
   if (msg.type === 'answer') {
-    // Peer sent back an answer
     const slot = hostPeerConnections.find(p => p.id === msg.peerId);
     if (!slot) return;
     try {
       await slot.pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
-      console.log('[Host] remote desc set for', msg.peerId);
-    } catch(e) {
-      console.warn('[Host] setRemoteDescription failed', e);
-    }
+    } catch(e) { console.warn('[Host] setRemoteDescription failed', e); }
   }
-  if (msg.type === 'ice') {
+  if (msg.type === 'ice_from_peer') {
     const slot = hostPeerConnections.find(p => p.id === msg.peerId);
     if (slot) {
       try { await slot.pc.addIceCandidate(new RTCIceCandidate(msg.candidate)); } catch(e) {}
@@ -501,13 +495,14 @@ async function createHostPeerSlot(peerId) {
 
   pc.onicecandidate = e => {
     if (e.candidate) {
-      sigSend(sigWS, { type: 'ice_h', peerId, candidate: e.candidate });
+      sigSend(sigWS, { type: 'ice_host_to_peer', peerId, candidate: e.candidate });
     }
   };
 
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
   sigSend(sigWS, { type: 'offer', peerId, sdp: pc.localDescription });
+  console.log('[Host] offer sent to', peerId);
 
   renderHostPeerList();
 }
@@ -601,23 +596,28 @@ async function peerJoinRoom() {
   roomCode = code;
   myPeerId = 'p' + Date.now().toString(36);
 
-  // Connect on peer channel
-  peerSigWS = sigConnect(code, 'peer', handlePeerSigMsg);
+  peerSigWS = sigConnect(handlePeerSigMsg);
   peerSigWS.onopen = () => {
-    document.getElementById('peer-sig-status').textContent = '✓ connected — announcing to host…';
+    document.getElementById('peer-sig-status').textContent = '✓ connected — joining room…';
     document.getElementById('peer-sig-status').style.color = 'var(--accent2)';
-    // Announce presence to host
-    setTimeout(() => sigSend(peerSigWS, { type: 'join', peerId: myPeerId }), 300);
+    sigSend(peerSigWS, { type: 'peer_join', code: roomCode, peerId: myPeerId });
   };
 }
 
 async function handlePeerSigMsg(msg) {
   console.log('[Peer] sig msg:', msg.type);
+  if (msg.type === 'joined') {
+    document.getElementById('peer-sig-status').textContent = '✓ room found — waiting for host offer…';
+  }
+  if (msg.type === 'error') {
+    toast('⚠ ' + msg.msg);
+    document.getElementById('peer-sig-status').textContent = '⚠ ' + msg.msg;
+    document.getElementById('peer-sig-status').style.color = 'var(--accent3)';
+  }
   if (msg.type === 'offer') {
-    if (msg.peerId !== myPeerId) return;
     await processPeerOffer(msg.sdp);
   }
-  if (msg.type === 'ice_h') {
+  if (msg.type === 'ice') {
     if (peerPC) {
       try { await peerPC.addIceCandidate(new RTCIceCandidate(msg.candidate)); } catch(e) {}
     }
@@ -634,7 +634,7 @@ async function processPeerOffer(sdp) {
 
   peerPC.onicecandidate = e => {
     if (e.candidate) {
-      sigSend(peerSigWS, { type: 'ice', peerId: myPeerId, candidate: e.candidate });
+      sigSend(peerSigWS, { type: 'ice_peer_to_host', peerId: myPeerId, candidate: e.candidate });
     }
   };
 
