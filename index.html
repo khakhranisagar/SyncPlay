@@ -165,6 +165,16 @@
   /* scrollbar */
   ::-webkit-scrollbar { width: 4px; }
   ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  /* ── SUBTITLES ── */
+  .sub-overlay { position:absolute; bottom:12px; left:0; right:0; text-align:center; pointer-events:none; z-index:10; padding:0 12px; }
+  .sub-line { display:inline-block; background:rgba(0,0,0,0.72); color:#fff; font-size:15px; line-height:1.5; padding:3px 10px; border-radius:4px; max-width:96%; font-family:'Syne',sans-serif; font-weight:400; margin:2px auto; white-space:pre-wrap; }
+  .sub-controls { display:flex; align-items:center; gap:10px; padding:0 20px 12px; flex-wrap:wrap; }
+  .sub-btn { font-family:var(--mono); font-size:11px; padding:6px 12px; border-radius:8px; border:1px solid var(--border2); background:var(--bg3); color:var(--muted); cursor:pointer; white-space:nowrap; -webkit-tap-highlight-color:transparent; }
+  .sub-btn.active { border-color:var(--accent2); color:var(--accent2); background:rgba(79,201,164,0.1); }
+  .sub-size-row { display:flex; align-items:center; gap:8px; padding:0 20px 16px; }
+  .sub-size-row label { font-family:var(--mono); font-size:11px; color:var(--muted); }
+
 </style>
 </head>
 <body>
@@ -249,8 +259,9 @@
 ══════════════════════════════════ -->
 <div id="screen-host-play" class="screen">
   <div class="player-bg">
-    <div class="video-area" id="host-video-area">
-      <video id="host-video" playsinline></video>
+    <div class="video-area" id="host-video-area" style="position:relative">
+      <video id="host-video" playsinline style="width:100%;height:100%;object-fit:contain"></video>
+      <div class="sub-overlay" id="host-sub-overlay"></div>
     </div>
     <div class="player-info">
       <p class="track-name" id="host-track-name">—</p>
@@ -270,6 +281,16 @@
       <div class="ctrl-btn" onclick="hostSkip(-10)">⏪</div>
       <div class="ctrl-btn play-btn" id="host-play-btn" onclick="hostTogglePlay()">▶</div>
       <div class="ctrl-btn" onclick="hostSkip(10)">⏩</div>
+    </div>
+    <div class="sub-controls" id="host-sub-controls">
+      <label class="sub-btn" for="host-sub-file-input" id="host-sub-btn">+ subtitle</label>
+      <input type="file" id="host-sub-file-input" accept=".srt,.vtt,.ass,.ssa" style="display:none">
+      <span id="host-sub-track-btns" style="display:flex;gap:6px;flex-wrap:wrap"></span>
+      <button class="sub-btn" onclick="hostSubOff()" id="host-sub-off-btn">off</button>
+    </div>
+    <div class="sub-size-row">
+      <label>sub size</label>
+      <input type="range" min="10" max="26" value="15" step="1" style="flex:1" oninput="setSubSize(this.value,'host')" id="host-sub-size">
     </div>
     <div class="peers-strip" id="host-peers-strip"></div>
   </div>
@@ -350,6 +371,12 @@
     </div>
   </div>
   <video id="peer-video" style="display:none" playsinline></video>
+  <div class="sub-controls" id="peer-sub-controls" style="display:none">
+    <label class="sub-btn" for="peer-sub-file-input">+ subtitle</label>
+    <input type="file" id="peer-sub-file-input" accept=".srt,.vtt,.ass,.ssa" style="display:none">
+    <span id="peer-sub-track-btns" style="display:flex;gap:6px;flex-wrap:wrap"></span>
+    <button class="sub-btn" onclick="peerSubOff()">off</button>
+  </div>
 </div>
 
 
@@ -369,7 +396,7 @@ const ICE_SERVERS = [
 // Signaling: use a free public WebSocket relay (PieSocket public channel)
 // Each room gets a unique channel derived from the 4-digit code
 // ← Replace this URL after deploying to Render
-const SIGNAL_URL = 'https://syncplay-signal.onrender.com';
+const SIGNAL_URL = 'wss://YOUR-APP-NAME.onrender.com';
 
 let sigWS = null;
 let roomCode = null;
@@ -825,6 +852,263 @@ function startPeerProgressUpdate() {
     document.getElementById('peer-time-cur').textContent = fmt(peerVideoEl.currentTime);
   }, 500);
 }
+
+
+// ══════════════════════════════════════════════════════
+//  SUBTITLE ENGINE
+// ══════════════════════════════════════════════════════
+
+// ── State ─────────────────────────────────────────────
+const subState = {
+  host: { tracks: [], activeIdx: -1, timer: null, size: 15 },
+  peer: { tracks: [], activeIdx: -1, timer: null, size: 15 }
+};
+
+// ── Parsers ───────────────────────────────────────────
+function parseSRT(text) {
+  const cues = [];
+  const blocks = text.replace(/\r/g, '').trim().split(/\n{2,}/);
+  for (const block of blocks) {
+    const lines = block.split('\n');
+    if (lines.length < 3) continue;
+    const timeLine = lines.find(l => l.includes('-->'));
+    if (!timeLine) continue;
+    const [startStr, endStr] = timeLine.split('-->').map(s => s.trim());
+    const start = srtTimeToSec(startStr);
+    const end = srtTimeToSec(endStr);
+    const text = lines.slice(lines.indexOf(timeLine) + 1).join('\n')
+      .replace(/<[^>]+>/g, '');  // strip HTML tags like <i>
+    if (!isNaN(start) && !isNaN(end)) cues.push({ start, end, text });
+  }
+  return cues;
+}
+
+function srtTimeToSec(t) {
+  const m = t.match(/(\d+):(\d+):(\d+)[,\.](\d+)/);
+  if (!m) return NaN;
+  return +m[1]*3600 + +m[2]*60 + +m[3] + +m[4]/1000;
+}
+
+function parseVTT(text) {
+  // VTT is similar to SRT, reuse parser after stripping header
+  const body = text.replace(/^WEBVTT.*\n/, '').replace(/NOTE[^\n]*\n/g, '');
+  return parseSRT(body);
+}
+
+function parseASS(text) {
+  const cues = [];
+  const lines = text.split('\n');
+  let inEvents = false;
+  let fmt = [];
+  for (const line of lines) {
+    if (line.trim() === '[Events]') { inEvents = true; continue; }
+    if (inEvents && line.startsWith('Format:')) {
+      fmt = line.replace('Format:', '').split(',').map(s => s.trim());
+      continue;
+    }
+    if (inEvents && line.startsWith('Dialogue:')) {
+      const parts = line.replace('Dialogue:', '').split(',');
+      const get = key => parts[fmt.indexOf(key)] || '';
+      const start = assTimeToSec(get('Start'));
+      const end = assTimeToSec(get('End'));
+      // Text is everything after the 9th comma
+      const textRaw = parts.slice(fmt.indexOf('Text')).join(',');
+      const text = textRaw
+        .replace(/\{[^}]*\}/g, '')   // strip ASS override tags
+        .replace(/\\N/g, '\n')
+        .replace(/\\n/g, '\n')
+        .trim();
+      if (!isNaN(start) && text) cues.push({ start, end, text });
+    }
+  }
+  return cues;
+}
+
+function assTimeToSec(t) {
+  const m = t.trim().match(/(\d+):(\d+):(\d+)\.(\d+)/);
+  if (!m) return NaN;
+  return +m[1]*3600 + +m[2]*60 + +m[3] + +m[4]/100;
+}
+
+// ── MKV internal subtitle extractor ───────────────────
+async function extractMKVSubs(file) {
+  // Read first 4MB — subtitle tracks are in the header + cue section
+  const CHUNK = 4 * 1024 * 1024;
+  const buf = await file.slice(0, CHUNK).arrayBuffer();
+  const u8 = new Uint8Array(buf);
+
+  // We look for SRT/SSA/ASS text embedded as UTF-8 blocks
+  // MKV stores subtitle cues as raw text blobs preceded by EBML element IDs
+  // Quick heuristic: find blocks that look like SRT timestamps
+  const dec = new TextDecoder('utf-8', { fatal: false });
+  const raw = dec.decode(u8);
+
+  const tracks = [];
+
+  // Try to find SRT-like content
+  const srtPattern = /\d+\n\d{2}:\d{2}:\d{2},\d{3} --> \d{2}:\d{2}:\d{2},\d{3}/g;
+  if (srtPattern.test(raw)) {
+    // Extract the region around matches
+    const region = raw.slice(raw.search(/\d+\n\d{2}:\d{2}:\d{2}/));
+    const cues = parseSRT(region);
+    if (cues.length > 0) {
+      tracks.push({ label: 'Internal (SRT)', cues });
+    }
+  }
+
+  // Try ASS/SSA
+  if (raw.includes('[Script Info]') && raw.includes('Dialogue:')) {
+    const start = raw.indexOf('[Script Info]');
+    const cues = parseASS(raw.slice(start));
+    if (cues.length > 0) {
+      tracks.push({ label: 'Internal (ASS)', cues });
+    }
+  }
+
+  return tracks;
+}
+
+// ── Load external subtitle file ────────────────────────
+async function loadExternalSub(file, role) {
+  const text = await file.text();
+  const name = file.name.toLowerCase();
+  let cues = [];
+  if (name.endsWith('.srt')) cues = parseSRT(text);
+  else if (name.endsWith('.vtt')) cues = parseVTT(text);
+  else if (name.endsWith('.ass') || name.endsWith('.ssa')) cues = parseASS(text);
+  else { toast('⚠ Unsupported subtitle format'); return; }
+
+  if (cues.length === 0) { toast('⚠ No cues found in subtitle file'); return; }
+
+  const state = subState[role];
+  const label = file.name.replace(/\.[^.]+$/, '');
+  state.tracks.push({ label, cues });
+  renderSubTrackBtns(role);
+  activateSubTrack(role, state.tracks.length - 1);
+  toast(`✓ Loaded ${cues.length} subtitle cues`);
+}
+
+// ── Load internal subs from MKV ────────────────────────
+async function loadInternalSubs(file, role) {
+  if (!file.name.toLowerCase().endsWith('.mkv') &&
+      !file.name.toLowerCase().endsWith('.webm')) return;
+  toast('⏳ Scanning for embedded subtitles…', 3000);
+  try {
+    const tracks = await extractMKVSubs(file);
+    if (tracks.length === 0) {
+      toast('No embedded subtitles found');
+      return;
+    }
+    const state = subState[role];
+    for (const t of tracks) state.tracks.push(t);
+    renderSubTrackBtns(role);
+    toast(`✓ Found ${tracks.length} embedded subtitle track${tracks.length > 1 ? 's' : ''}`);
+  } catch(e) {
+    console.warn('MKV sub extract failed:', e);
+    toast('Could not read embedded subs — use external file');
+  }
+}
+
+// ── UI: render track selector buttons ─────────────────
+function renderSubTrackBtns(role) {
+  const container = document.getElementById(`${role}-sub-track-btns`);
+  if (!container) return;
+  const state = subState[role];
+  container.innerHTML = state.tracks.map((t, i) => `
+    <button class="sub-btn ${state.activeIdx === i ? 'active' : ''}"
+      onclick="activateSubTrack('${role}', ${i})">${t.label}</button>
+  `).join('');
+}
+
+function activateSubTrack(role, idx) {
+  const state = subState[role];
+  state.activeIdx = idx;
+  renderSubTrackBtns(role);
+  startSubLoop(role);
+  toast(`✓ Subtitles: ${state.tracks[idx].label}`);
+}
+
+function hostSubOff() {
+  subState.host.activeIdx = -1;
+  renderSubTrackBtns('host');
+  const overlay = document.getElementById('host-sub-overlay');
+  if (overlay) overlay.innerHTML = '';
+  document.getElementById('host-sub-off-btn').classList.add('active');
+}
+
+function peerSubOff() {
+  subState.peer.activeIdx = -1;
+  renderSubTrackBtns('peer');
+}
+
+function setSubSize(val, role) {
+  subState[role].size = +val;
+  document.querySelectorAll(`#${role}-sub-overlay .sub-line`)
+    .forEach(el => el.style.fontSize = val + 'px');
+}
+
+// ── Subtitle render loop ───────────────────────────────
+function startSubLoop(role) {
+  const state = subState[role];
+  if (state.timer) clearInterval(state.timer);
+  state.timer = setInterval(() => renderSubFrame(role), 100);
+}
+
+function renderSubFrame(role) {
+  const state = subState[role];
+  if (state.activeIdx < 0) return;
+  const track = state.tracks[state.activeIdx];
+  if (!track) return;
+
+  const video = role === 'host' ? hostVideoEl : peerVideoEl;
+  if (!video) return;
+  const t = video.currentTime;
+
+  const overlay = role === 'host'
+    ? document.getElementById('host-sub-overlay')
+    : null; // peer is audio-only, no overlay needed
+
+  const activeCues = track.cues.filter(c => t >= c.start && t <= c.end);
+
+  if (overlay) {
+    overlay.innerHTML = activeCues.map(c =>
+      `<div class="sub-line" style="font-size:${state.size}px">${escHtml(c.text)}</div>`
+    ).join('');
+  }
+}
+
+function escHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\n/g,'<br>');
+}
+
+// ── Wire up file inputs ────────────────────────────────
+document.getElementById('host-sub-file-input').addEventListener('change', e => {
+  const f = e.target.files[0];
+  if (f) loadExternalSub(f, 'host');
+  e.target.value = '';
+});
+
+document.getElementById('peer-sub-file-input').addEventListener('change', e => {
+  const f = e.target.files[0];
+  if (f) loadExternalSub(f, 'peer');
+  e.target.value = '';
+});
+
+// Hook into launchHostPlayer to also scan for internal subs
+const _origLaunchHost = launchHostPlayer;
+launchHostPlayer = function() {
+  _origLaunchHost();
+  if (hostFile) loadInternalSubs(hostFile, 'host');
+  document.getElementById('host-sub-off-btn').classList.add('active');
+};
+
+// Hook into peerSendReady to also scan internal subs
+const _origPeerReady = peerSendReady;
+peerSendReady = function() {
+  _origPeerReady();
+  if (peerFile) loadInternalSubs(peerFile, 'peer');
+};
 
 // ══════════════════════════════════════════════════════
 //  PWA — MANIFEST + SERVICE WORKER (inlined as blobs)
